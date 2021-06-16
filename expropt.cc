@@ -21,6 +21,12 @@
 
 #include "expropt.h"
 
+#include "config_pkg.h"
+
+#ifdef FOUND_exproptcommercial
+#include <act/exproptcommercial.h>
+#endif
+
 /**
  * Destroy the External Expr Opt:: External Expr Opt object
  * 
@@ -241,21 +247,21 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   // generate the exec command for the sysntesis tool and run the syntesis
   int exec_failure = 1;
 
-  #ifdef FOUND_exproptcommertial
+#ifdef FOUND_exproptcommercial
   ExprOptCommercialHelper *helper = new ExprOptCommercialHelper();
-  #endif
+#endif
 
   switch (mapper)
   {
   case genus:
-    #ifdef FOUND_exproptcommertial
+#ifdef FOUND_exproptcommercial
     if (expr_output_file.empty()) exec_failure = helper->run_genus(verilog_file,mapped_file,expr_set_name, true);
     else exec_failure = helper->run_genus(verilog_file,mapped_file,expr_set_name);
     break;
-    #else
+#else
     fatal_error("cadence genus support was not enabled on compile time");
     break;
-    #endif
+#endif
     
   case synopsis:
     // would need a sample script to implement this
@@ -295,7 +301,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   {
   case genus:
   {
-    #ifdef FOUND_exproptcommertial
+#ifdef FOUND_exproptcommercial
     std::string genus_log = mapped_file.data();
     info = new ExprBlockInfo(             
                     helper->parse_genus_log(genus_log, metadata_delay_typ),
@@ -309,9 +315,9 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
                     helper->parse_genus_log(genus_log, metadata_power_max_static),
                     helper->parse_genus_log(genus_log, metadata_power_max_dynamic)
                     );
-    #else
+#else
     fatal_error("cadence genus support was not enabled on compile time");
-    #endif
+#endif
   }
     break;
   case synopsis:

@@ -26,13 +26,6 @@
 #include <string>
 #include <regex>
 #include <fstream>
-/* this is a very nasty hack, it assumes that the configure is always done on top level*/
-#ifndef __CONFIG_PKG_H__
-#include "config_pkg.h"
-#endif
-#ifdef FOUND_exproptcommercial
-#include <act/exproptcommercial.h>
-#endif
 
 /**
  * enum for referencing the mapper software type, to define which external syntesis tool to use for syntesis
