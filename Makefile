@@ -48,14 +48,14 @@ SRCS= $(OBJS2:.o=.cc)
 
 #SUBDIRSPOST=test
 
-include $(VLSI_TOOLS_SRC)/scripts/Makefile.std
+include $(ACT_HOME)/scripts/Makefile.std
 
 $(LIB): $(OBJS) 
 	ar ruv $(LIB) $(OBJS)
 	$(RANLIB) $(LIB)
 
 $(SHLIB): $(SHOBJS) 
-	$(VLSI_TOOLS_SRC)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBCOMMON) $(EXPRCOMLIB)
+	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBCOMMON) $(EXPRCOMLIB)
 
 SUBDIRS=example
 

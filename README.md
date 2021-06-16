@@ -8,7 +8,7 @@ is used the optimise sets of expressions (data pass only) by using external syst
  - abc and therefore yosys can not handle cells with more than one output like fulladder and therefor will ignore them during mapping
 
 ## install
-to use it make sure you have act properly installed and $ACT_HOME and $VLSI_TOOLS_SRC is pointing to your install.
+to use it make sure you have act properly installed and $ACT_HOME is pointing to your install.
 
 use
 ```
