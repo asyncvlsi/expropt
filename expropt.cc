@@ -242,7 +242,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   int exec_failure = 1;
 
   #ifdef FOUND_exproptcommertial
-  ExprOptCommertialHelper *helper = new ExprOptCommertialHelper();
+  ExprOptCommercialHelper *helper = new ExprOptCommercialHelper();
   #endif
 
   switch (mapper)
@@ -625,7 +625,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       b = ihash_lookup (exprmap, (long)(e));
       if (b) fprintf(output_stream, "%s", (char *)b->v);
       else {
-        fprintf(output_stream, "64'd%llu", e->u.v);
+        fprintf(output_stream, "64'd%lu", e->u.v);
       }
     }
       
@@ -750,7 +750,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       ihash_bucket_t *b;
       b = ihash_lookup (exprmap, (long)(e));
       if (b) fprintf(output_stream, "%s", (unsigned long)b->v);
-      else fprintf(output_stream, "64'd%llu", e->u.v);
+      else fprintf(output_stream, "64'd%lu", e->u.v);
     }
       break;
     case (E_RAWFREE):

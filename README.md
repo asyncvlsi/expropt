@@ -23,7 +23,7 @@ the library is an addon for The ACT language and core tools (https://github.com/
 
 the library requires you to have yosys (https://github.com/cliffordwolf/yosys.git) and abc (https://github.com/berkeley-abc/abc) and sed (check you package manager) installed on your system and the excutables to be in your $path during runtime use.
 
-for commertial syntesis check the expropt_commertial library (closed source because tool APIs are under NDA), it will be automaticly picked up if installed on your system.
+for commercial syntesis check the exproptcommercial library (closed source because tool APIs are under NDA), it will be automaticly picked up if installed on your system as a shared library.
 
 ## example and test dependencies
 

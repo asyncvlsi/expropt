@@ -30,8 +30,8 @@
 #ifndef __CONFIG_PKG_H__
 #include "config_pkg.h"
 #endif
-#ifdef FOUND_exproptcommertial
-#include <act/exproptcommertial.h>
+#ifdef FOUND_exproptcommercial
+#include <act/exproptcommercial.h>
 #endif
 
 /**

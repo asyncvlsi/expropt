@@ -36,8 +36,8 @@ OBJS2=expropt.o
 
 OBJS= $(OBJS2)
 
-ifdef exproptcommertial_INCLUDE
-EXPRCOMLIB=-lexproptcommertial_sh
+ifdef exproptcommercial_INCLUDE
+EXPRCOMLIB=-lexproptcommercial_sh
 else
 EXPRCOMLIB=
 endif
