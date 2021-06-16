@@ -241,14 +241,14 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   // generate the exec command for the sysntesis tool and run the syntesis
   int exec_failure = 1;
 
-  #ifdef FOUND_exproptcommertial
+  #ifdef FOUND_exproptcommercial
   ExprOptCommercialHelper *helper = new ExprOptCommercialHelper();
   #endif
 
   switch (mapper)
   {
   case genus:
-    #ifdef FOUND_exproptcommertial
+    #ifdef FOUND_exproptcommercial
     if (expr_output_file.empty()) exec_failure = helper->run_genus(verilog_file,mapped_file,expr_set_name, true);
     else exec_failure = helper->run_genus(verilog_file,mapped_file,expr_set_name);
     break;
@@ -295,7 +295,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   {
   case genus:
   {
-    #ifdef FOUND_exproptcommertial
+    #ifdef FOUND_exproptcommercial
     std::string genus_log = mapped_file.data();
     info = new ExprBlockInfo(             
                     helper->parse_genus_log(genus_log, metadata_delay_typ),
