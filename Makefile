@@ -55,7 +55,7 @@ $(LIB): $(OBJS)
 	$(RANLIB) $(LIB)
 
 $(SHLIB): $(SHOBJS) 
-	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBCOMMON) $(EXPRCOMLIB)
+	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB)
 
 SUBDIRS=example
 
