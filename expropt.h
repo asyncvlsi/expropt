@@ -141,10 +141,12 @@ public:
                     power_max_static(e_power_max_static) { }
     
     /**
-     * Construct a new Expr Block dummy with no extration results => all 0.
+     * Construct a new Expr Block dummy with no extration results =>
+     * all 0, but delay_typ = -1 to indicate that the results were not
+     * created.
      */
     ExprBlockInfo( ) : 
-                    delay_typ(0),
+                    delay_typ(-1),
                     delay_min(0),
                     delay_max(0),
                     power_typ(0),
