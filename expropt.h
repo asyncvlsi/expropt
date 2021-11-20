@@ -280,6 +280,8 @@ public:
                           config_set_default_string ("expropt.liberty_ff_lowtemp", "none");
                           config_set_default_string ("expropt.liberty_ss_hightemp", "none");
 
+			  config_set_default_real ("expropt.default_load", 1.0);
+
                           config_read("expropt.conf");
 
                           if (wire_encoding == qdi){

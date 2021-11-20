@@ -27,6 +27,8 @@
 #include <act/exproptcommercial.h>
 #endif
 
+#include <string.h>
+
 /**
  * Destroy the External Expr Opt:: External Expr Opt object
  * 
@@ -212,6 +214,31 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
 
 }
 
+static double parse_abc_info (const char *file)
+{
+  char buf[10240];
+  FILE *fp;
+  double ret;
+
+  snprintf (buf, 10240, "%s.log", file);
+  fp = fopen (buf, "r");
+  if (!fp) {
+    return 0;
+  }
+  while (fgets (buf, 10240, fp)) {
+    if (strncmp (buf, "ABC:", 4) == 0) {
+      char *tmp = strstr (buf, "Delay =");
+      if (tmp) {
+	if (sscanf (tmp, "Delay = %lf ps", &ret) == 1) {
+	  fclose (fp);
+	  return ret*1e-12;
+	}
+      }
+    }
+  }
+  return 0;
+}
+
 /**
  * first constuct the filenames for the temporary files and than generate the verilog, exc the external tool, read out the results and convert them back to act.
  * 
@@ -229,6 +256,11 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   mapped_file.append("_mapped.v");
   char cmd[4096] = "";
   FILE *verilog_stream;
+
+  std::string sdc_file = ".";
+  sdc_file.append("/exprop_");
+  sdc_file.append(expr_set_name);
+  sdc_file.append(".sdc");
 
   // open temp verilog file to be syntesised
 
@@ -268,12 +300,21 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     fatal_error("synopsis compiler is not implemented yet");
     break;
   case yosys:
+    {
+      /* create a .sdc file to get delay values */
+      verilog_stream = fopen (sdc_file.data(), "w");
+      if (!verilog_stream) {
+	fatal_error ("Could not open `%s' file!", sdc_file.data());
+      }
+      fprintf (verilog_stream, "set_load %g\n", config_get_real ("expropt.default_load"));
+      fclose (verilog_stream);
+    }
   default:
     // yosys gets its script passed via stdin (very short)
     char* configreturn = config_get_string("expropt.liberty_tt_typtemp");
     if (std::strcmp(configreturn,"none") != 0)
     {
-      if (use_tie_cells) sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+      if (use_tie_cells) sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(), mapped_file.data());
       else sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex -nodec %s;\" | yosys > %s.log", verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
     }
     else fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
@@ -325,7 +366,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     break;
   case yosys:
   default:
-    info =  new ExprBlockInfo();
+    info =  new ExprBlockInfo(parse_abc_info (mapped_file.data()),
+			      0, 0, 0, 0, 0, 0, 0, 0, 0);
     break;
   }
 
@@ -339,7 +381,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     case synopsis:
     case yosys:
     default:
-      sprintf(cmd,"rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(), mapped_file.data());
+      sprintf(cmd,"rm %s && rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(),
+	      sdc_file.data(), mapped_file.data());
       break;
     }
     if (config_get_int("expropt.verbose") == 2) printf("running: %s \n",cmd);
@@ -755,7 +798,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
     {
       ihash_bucket_t *b;
       b = ihash_lookup (exprmap, (long)(e));
-      if (b) fprintf(output_stream, "%s", (unsigned long)b->v);
+      if (b) fprintf(output_stream, "%s", (char *)b->v);
       else fprintf(output_stream, "64'd%lu", e->u.v);
     }
       break;
