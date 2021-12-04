@@ -608,6 +608,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
  * if a mapping exsists for these leaf types the mapping will be prefered over printing the value.
  */
 void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable *exprmap) {
+  fprintf (output_stream, "(");
   switch (e->type) {
     case (E_AND):
       print_expression(output_stream, e->u.e.l, exprmap);
@@ -822,6 +823,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       fprintf(output_stream, "Whaaat?! %i\n", e->type);
       break;
   }
+  fprintf (output_stream, ")");
 }
 
 /**
