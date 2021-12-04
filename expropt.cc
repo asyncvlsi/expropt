@@ -775,11 +775,16 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       }
       break;
     case (E_BITFIELD):
-      fatal_error("bitfeld conversion needs to be updated to new data struct");
       unsigned int l;
       unsigned int r;
-      l = (unsigned long) e->u.e.r->u.e.r;
-      r = (unsigned long) e->u.e.r->u.e.l;
+      if (e->u.e.r->u.e.l) {
+         l = (unsigned long) e->u.e.r->u.e.r->u.v;
+         r = (unsigned long) e->u.e.r->u.e.l->u.v;
+      }
+      else {
+         l = (unsigned long) e->u.e.r->u.e.r->u.v;
+         r = l;
+      }
       fprintf(output_stream, "\\");
       ((ActId *) e->u.e.l)->Print(output_stream);
       fprintf(output_stream, " [");
