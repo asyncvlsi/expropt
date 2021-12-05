@@ -766,12 +766,20 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       fatal_error("%u should have been handled else where", e->type);
       break;
     case (E_CONCAT):
-      print_expression(output_stream, e->u.e.l, exprmap);
-      if (e->u.e.r, exprmap) {
-        fprintf(output_stream, " ,");
-        print_expression(output_stream, e->u.e.r, exprmap);
-      } else {
-        fprintf(output_stream, " }");
+      if (!e->u.e.r) {
+	print_expression(output_stream, e->u.e.l, exprmap);
+      }
+      else {
+	Expr *tmp = e;
+	fprintf (output_stream, "{");
+	while (tmp) {
+	  print_expression(output_stream, e->u.e.r, exprmap);
+	  if (tmp->u.e.r) {
+	    fprintf(output_stream, " ,");
+	  }
+	  tmp = tmp->u.e.r;
+	}
+	fprintf (output_stream, "}");
       }
       break;
     case (E_BITFIELD):
@@ -785,8 +793,17 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
          l = (unsigned long) e->u.e.r->u.e.r->u.v;
          r = l;
       }
+
+      {
+	ihash_bucket_t *b;
+	b = ihash_lookup (exprmap, (long)(e));
+	Assert (b, "variable not found in variable map");
+	fprintf(output_stream, "%s", (char *)b->v);
+      }
+#if 0      
       fprintf(output_stream, "\\");
       ((ActId *) e->u.e.l)->Print(output_stream);
+#endif      
       fprintf(output_stream, " [");
       if (l!=r) {
         fprintf(output_stream, "%i:", l);
