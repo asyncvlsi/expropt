@@ -773,7 +773,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
 	Expr *tmp = e;
 	fprintf (output_stream, "{");
 	while (tmp) {
-	  print_expression(output_stream, e->u.e.r, exprmap);
+	  print_expression(output_stream, tmp->u.e.l, exprmap);
 	  if (tmp->u.e.r) {
 	    fprintf(output_stream, " ,");
 	  }
