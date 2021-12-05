@@ -610,6 +610,27 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
 void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable *exprmap) {
   fprintf (output_stream, "(");
   switch (e->type) {
+  case E_BUILTIN_BOOL:
+    print_expression(output_stream, e->u.e.l, exprmap);
+    fprintf (output_stream, " == 0 ? 1'b0 : 1'b1");
+    break;
+
+  case E_BUILTIN_INT:
+    if (!e->u.e.r) {
+      print_expression(output_stream, e->u.e.l, exprmap);
+    }
+    else {
+      int v;
+      print_expression(output_stream, e->u.e.l, exprmap);
+      fprintf (output_stream, " & ");
+      v = e->u.e.r->u.v;
+      fprintf (output_stream, "%d'b", v);
+      for (int i=0; i < v; i++) {
+	fprintf (output_stream, "1");
+      }
+    }
+    break;
+    
     case (E_AND):
       print_expression(output_stream, e->u.e.l, exprmap);
       fprintf(output_stream, " & ");
