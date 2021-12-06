@@ -314,8 +314,28 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     char* configreturn = config_get_string("expropt.liberty_tt_typtemp");
     if (std::strcmp(configreturn,"none") != 0)
     {
-      if (use_tie_cells) sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(), mapped_file.data());
-      else sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex -nodec %s;\" | yosys > %s.log", verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+      int constr = 0;
+      if (config_exists ("expropt.abc_use_constraints")) {
+	if (config_get_int ("expropt.abc_use_constraints") == 1) {
+	  constr = 1;
+	}
+      }
+      if (use_tie_cells) {
+	if (constr) {
+	  sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(), mapped_file.data());
+	}
+	else {
+	  sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+	}
+      }
+      else {
+	if (constr) {
+	  sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; write_verilog  -nohex -nodec %s;\" | yosys > %s.log", verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(), mapped_file.data());
+	}
+	else {
+	  sprintf(cmd,"echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex -nodec %s;\" | yosys > %s.log", verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+	}
+      }
     }
     else fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
     if (config_get_int("expropt.verbose") == 2) printf("running: %s \n",cmd);
