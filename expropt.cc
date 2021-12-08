@@ -223,7 +223,7 @@ static double parse_abc_info (const char *file)
   snprintf (buf, 10240, "%s.log", file);
   fp = fopen (buf, "r");
   if (!fp) {
-    return 0;
+    return -1;
   }
   while (fgets (buf, 10240, fp)) {
     if (strncmp (buf, "ABC:", 4) == 0) {
@@ -236,7 +236,7 @@ static double parse_abc_info (const char *file)
       }
     }
   }
-  return 0;
+  return -1;
 }
 
 /**
