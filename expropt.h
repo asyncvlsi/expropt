@@ -130,15 +130,15 @@ public:
                     const double e_power_max_static = 0,
                     const double e_power_max_dynamic = 0) : 
                     delay_typ(e_delay_typ),
-                    delay_min(e_delay_min),
                     delay_max(e_delay_max),
+                    delay_min(e_delay_min),
                     power_typ(e_power_typ),
-                    power_max(e_power_max),
-                    area(e_area),
-                    power_typ_dynamic(e_power_typ_dynamic),
                     power_typ_static(e_power_typ_static),
+                    power_typ_dynamic(e_power_typ_dynamic),
+                    power_max(e_power_max),
+                    power_max_static(e_power_max_static),
                     power_max_dynamic(e_power_max_dynamic),
-                    power_max_static(e_power_max_static) { }
+                    area(e_area) { }
     
     /**
      * Construct a new Expr Block dummy with no extration results =>
@@ -147,15 +147,15 @@ public:
      */
     ExprBlockInfo( ) : 
                     delay_typ(-1),
-                    delay_min(0),
                     delay_max(0),
+                    delay_min(0),
                     power_typ(0),
-                    power_max(0),
-                    area(0),
-                    power_typ_dynamic(0),
                     power_typ_static(0),
+                    power_typ_dynamic(0),
+                    power_max(0),
+                    power_max_static(0),
                     power_max_dynamic(0),
-                    power_max_static(0) { }
+                    area(0){ }
     ~ExprBlockInfo() { }
 };
 
@@ -259,12 +259,13 @@ public:
                     const std::string expr_file_path = "",
                     const std::string exprid_prefix = "e",
                     const std::string block_prefix = "blk") 
-                    : mapper(datapath_syntesis_tool),
-                      wire_encoding(mapping_target),
-                      expr_output_file(expr_file_path),
-                      use_tie_cells(tie_cells),
-                      expr_prefix(exprid_prefix),
-                      module_prefix(block_prefix)
+                    :
+                        expr_output_file(expr_file_path),
+	                    expr_prefix(exprid_prefix),
+	                    module_prefix(block_prefix),
+						mapper(datapath_syntesis_tool),
+	                    use_tie_cells(tie_cells),
+                        wire_encoding(mapping_target)
                       { 
                           
                           config_set_default_int ("expropt.clean_tmp_files", 1);

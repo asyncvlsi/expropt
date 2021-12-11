@@ -11,3 +11,5 @@ prsim.out
 config_pkg.h
 config.mk
 *.so
+.cproject
+.project
