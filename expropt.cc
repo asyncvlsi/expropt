@@ -952,7 +952,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
 
     // dont know sanity check, works also without
     fprintf(tcl_file, "check_design\n"); // do we need them?
-    fprintf(tcl_file, "check_design -unresolved\n",process_name); // do we need them?
+    fprintf(tcl_file, "check_design -unresolved\n"); // do we need them?
 
     // the timing contraint file for timing reports
     configreturn3 = config_get_string("expropt.timing_constraint_sdf");
