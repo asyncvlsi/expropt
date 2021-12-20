@@ -214,29 +214,118 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
 
 }
 
-static double parse_abc_info (const char *file)
+/*
+ * This is a hack, fix this later...
+ * Taken from OSU .lib file
+ */
+static struct cell_info {
+  const char *name;
+  double area;
+  int count;
+} _cell_info[] = {
+	  { "AND2X1", 32, 0 },
+	  { "AND2X2", 32, 0 },
+	  { "AOI21X1", 32, 0 },
+	  { "AND2X1", 32, 0 },
+	  { "AOI22X2", 40, 0 },
+	  { "BUFX2", 24, 0 },
+	  { "BUFX4", 32, 0 },
+	  { "CLKBUF1", 72, 0 },
+	  { "CLKBUF2", 104, 0 },
+	  { "CLKBUF3", 136, 0 },
+	  { "FAX1", 120, 0 },
+	  { "HAX1", 80, 0 },
+	  { "INVX1", 16, 0 },
+	  { "INVX2", 16, 0 },
+	  { "INVX4", 24, 0 },
+	  { "INVX8", 40, 0 },
+	  { "LATCH", 16, 0 },
+	  { "MUX2X1", 48, 0 },
+	  { "NAND2X1", 24, 0 },
+	  { "NAND3X1", 36, 0 },
+	  { "NOR2X1", 24, 0 },
+	  { "NOR3X1", 64, 0 },
+	  { "OAI21X1", 24, 0 },
+	  { "OAI22X1", 40, 0 },
+	  { "OR2X1", 32, 0 },
+	  { "OR2X2", 32, 0 },
+	  { "TBUFX1", 40, 0 },
+	  { "TBUFX2", 56, 0 },
+	  { "XNOR2X1", 56, 0 },
+	  { "XOR2X1", 56, 0 }
+};
+
+static double parse_abc_info (const char *file, double *area)
 {
   char buf[10240];
   FILE *fp;
   double ret;
+  int i;
 
   snprintf (buf, 10240, "%s.log", file);
   fp = fopen (buf, "r");
   if (!fp) {
     return -1;
   }
+
+  ret = -1;
+  for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
+    _cell_info[i].count = 0;
+  }
+
   while (fgets (buf, 10240, fp)) {
     if (strncmp (buf, "ABC:", 4) == 0) {
       char *tmp = strstr (buf, "Delay =");
       if (tmp) {
 	if (sscanf (tmp, "Delay = %lf ps", &ret) == 1) {
-	  fclose (fp);
-	  return ret*1e-12;
+	  ret = ret*1e12;
+	}
+      }
+    }
+    else if (strncmp (buf, "ABC RESULTS:", 12) == 0) {
+      char *tmp = buf + 12;
+      while (*tmp && isspace (*tmp)) {
+	tmp++;
+      }
+      if (*tmp) {
+	char *cell_name = tmp;
+	while (*tmp && !isspace (*tmp)) {
+	  tmp++;
+	}
+	if (*tmp) {
+	  *tmp = '\0';
+	  tmp++;
+	}
+	int count = -1;
+	if (strncmp (tmp, "cells:", 6) == 0) {
+	  tmp += 6;
+	  if (sscanf (tmp, "%d", &count) != 1) {
+	    count = -1;
+	  }
+	}
+	if (*tmp && count > 0) {
+	  int i;
+	  for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
+	    if (strcmp (cell_name, _cell_info[i].name) == 0) {
+	      _cell_info[i].count++;
+	      break;
+	    }
+	  }
+	  //printf ("got cell %s, count = %d\n", cell_name, count);
+	  /* got cell count! */
+	  /* XXX: the area is in the .lib file... */
 	}
       }
     }
   }
-  return -1;
+  if (area) {
+    int i;
+    *area = 0;
+    for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
+      *area += _cell_info[i].area * _cell_info[i].count;
+    }
+  }
+  return ret;
 }
 
 /**
@@ -386,8 +475,12 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     break;
   case yosys:
   default:
-    info =  new ExprBlockInfo(parse_abc_info (mapped_file.data()),
-			      0, 0, 0, 0, 0, 0, 0, 0, 0);
+    { double delay, area;
+      area = 0.0;
+      delay = parse_abc_info (mapped_file.data(), &area);
+      info =  new ExprBlockInfo(delay,
+			      0, 0, 0, 0, 0, 0, 0, 0, area);
+    }
     break;
   }
 
