@@ -278,7 +278,7 @@ static double parse_abc_info (const char *file, double *area)
       char *tmp = strstr (buf, "Delay =");
       if (tmp) {
 	if (sscanf (tmp, "Delay = %lf ps", &ret) == 1) {
-	  ret = ret*1e12;
+	  ret = ret*1e-12;
 	}
       }
     }
