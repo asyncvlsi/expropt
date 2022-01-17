@@ -30,17 +30,21 @@ else()
     message("Found Library exproptcomm: NO")
 endif()
 
+# hack to get around old configuration method
+add_compile_definitions(__CONFIG_PKG_H__)
+
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# add_compile_options(-Wall -Wextra -Wcast-qual -Wconversion-null
-#         -Wmissing-declarations -Woverlength-strings)
-# add_compile_options(-Wpointer-arith -Wunused-local-typedefs -Wunused-result
-#        -Wvarargs -Wvla -Wwrite-strings)
-# add_compile_options(-Wformat-security -Wundef)
-# add_compile_options(-g -fsanitize=undefined -Werror)
-# add_link_options(-ldl -fsanitize=undefined)
+add_compile_options(-Wall -Wextra -Wcast-qual -Wconversion-null
+         -Wmissing-declarations -Woverlength-strings)
+add_compile_options(-Wpointer-arith -Wunused-local-typedefs -Wunused-result
+       -Wvarargs -Wvla -Wwrite-strings)
+add_compile_options(-Wformat-security -Wundef)
+add_compile_options(-g -fsanitize=undefined -Werror)
+add_link_options(-ldl -fsanitize=undefined)
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy; -checks=*; -warnings-as-errors=*;)
 
 # This is just for testing. Doesnt do a real build/install

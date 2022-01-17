@@ -156,7 +156,7 @@ public:
                     power_max_static(0),
                     power_max_dynamic(0),
                     area(0){ }
-    ~ExprBlockInfo() { }
+    ~ExprBlockInfo() = default;
 };
 
 /**

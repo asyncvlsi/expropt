@@ -56,7 +56,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number, int targe
   Expr* e = NULL;
   for (li = list_first (in_expr_list); li; li = list_next (li))
   { 
-    e = (Expr *) list_value(li);
+    e = (Expr *) const_cast<void *>(list_value(li));
     // change from int to C string
     ihash_bucket_t *b_map,*b_new;
     b_map = ihash_lookup(in_expr_map, (long) e);
@@ -92,7 +92,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number, int targe
 /*
  * the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to ExprOpt standart
  */
-ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number, list_t *expr_list, list_t *in_list, list_t *out_list, iHashtable *exprmap_int)
+ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number, list_t */*expr_list*/, list_t *in_list, list_t *out_list, iHashtable *exprmap_int)
 {
   //build the data structures need
   ExprBlockInfo* info;
@@ -260,7 +260,6 @@ static double parse_abc_info (const char *file, double *area)
   char buf[10240];
   FILE *fp;
   double ret;
-  int i;
 
   snprintf (buf, 10240, "%s.log", file);
   fp = fopen (buf, "r");
@@ -269,7 +268,7 @@ static double parse_abc_info (const char *file, double *area)
   }
 
   ret = -1;
-  for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
+  for (int i=0; i < (ssize_t)(sizeof (_cell_info)/sizeof (_cell_info[0])); i++) {
     _cell_info[i].count = 0;
   }
 
@@ -305,7 +304,7 @@ static double parse_abc_info (const char *file, double *area)
 	}
 	if (*tmp && count > 0) {
 	  int i;
-	  for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
+	  for (i=0; i < (ssize_t)(sizeof (_cell_info)/sizeof (_cell_info[0])); i++) {
 	    if (strcmp (cell_name, _cell_info[i].name) == 0) {
 	      _cell_info[i].count++;
 	      break;
@@ -321,7 +320,7 @@ static double parse_abc_info (const char *file, double *area)
   if (area) {
     int i;
     *area = 0;
-    for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
+    for (i=0; i < (ssize_t)(sizeof (_cell_info)/sizeof (_cell_info[0])); i++) {
       *area += _cell_info[i].area * _cell_info[i].count;
     }
   }
@@ -398,6 +397,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
       fprintf (verilog_stream, "set_load %g\n", config_get_real ("expropt.default_load"));
       fclose (verilog_stream);
     }
+    // FALLTHROUGH
   default:
     // yosys gets its script passed via stdin (very short)
     char* configreturn = config_get_string("expropt.liberty_tt_typtemp");
@@ -570,12 +570,12 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
     if (first) first=false; 
     else fprintf(output_stream, ", ");
     Assert(li_name, "output name list and output expr list dont have the same length");
-    std::string current = (char *) list_value (li_name);
+    std::string current = (char *) const_cast<void *>(list_value (li_name));
     bool skip = false;
     // omit ports with the same name
     for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
     {
-      std::string search =  (char *) list_value (li_search);
+      std::string search =  (char *) const_cast<void *>(list_value (li_search));
       if (current.compare(search) == 0) {
         skip = true;
         break;
@@ -617,12 +617,12 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
   {
     // make sure you dont print a port 2+ times - the tools really dont like that
     Assert(li_name, "output name list and output expr list dont have the same length");
-    std::string current = (char *) list_value (li_name);
+    std::string current = (char *) const_cast<void *>(list_value (li_name));
     bool skip = false;
     // omit ports with the same name
     for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
     {
-      std::string search =  (char *) list_value (li_search);
+      std::string search =  (char *) const_cast<void *>(list_value (li_search));
       if (current.compare(search) == 0) {
         skip = true;
         break;
@@ -644,14 +644,14 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
     fprintf(output_stream, "\n\t// the hidden logic vars declare\n");
     for (li = list_first (expr_list); li; li = list_next (li))
     {
-      Expr *e = (Expr*) list_value (li);
+      // Expr *e = (Expr*) const_cast<void *>(list_value (li));
       Assert(li_name, "output name list and output expr list dont have the same length");
-      std::string current = (char *) list_value (li_name);
+      std::string current = (char *) const_cast<void *>(list_value (li_name));
       bool skip = false;
       // omit ports with the same name
       for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
       {
-        std::string search =  (char *) list_value (li_search);
+        std::string search =  (char *) const_cast<void *>(list_value (li_search));
         if (current.compare(search) == 0) {
           skip = true;
           break;
@@ -674,14 +674,14 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
     fprintf(output_stream, "\n\t// the hidden logic statements as assigns\n");
     for (li = list_first (expr_list); li; li = list_next (li))
     {
-      Expr *e = (Expr*) list_value (li);
+      Expr *e = (Expr*) const_cast<void *>(list_value (li));
       Assert(li_name, "output name list and output expr list dont have the same length");
-      std::string current = (char *) list_value (li_name);
+      std::string current = (char *) const_cast<void *>(list_value (li_name));
       bool skip = false;
       // omit ports with the same name
       for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
       {
-        std::string search =  (char *) list_value (li_search);
+        std::string search =  (char *) const_cast<void *>(list_value (li_search));
         if (current.compare(search) == 0) {
           skip = true;
           break;
@@ -701,8 +701,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream, const char* expr_
   li_name = list_first (out_expr_name_list);
   for (li = list_first (out_list); li; li = list_next (li))
   {
-    Expr *e = (Expr*) list_value (li);
-    std::string current = (char *) list_value (li_name);
+    Expr *e = (Expr*) const_cast<void *>(list_value (li));
+    std::string current = (char *) const_cast<void *>(list_value (li_name));
     fprintf(output_stream,"\tassign %s = ", current.data());
     print_expression(output_stream, e, inexprmap);
     fprintf(output_stream,";\n");
