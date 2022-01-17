@@ -26,6 +26,7 @@
 #include <fstream>
 #include <regex>
 #include <string>
+#include <utility>
 
 /**
  * enum for referencing the mapper software type, to define which external syntesis tool to use for syntesis
@@ -225,7 +226,7 @@ class ExternalExprOpt {
      */
     ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map,
                                     iHashtable *in_width_map, list_t *out_expr_list, iHashtable *out_expr_map,
-                                    iHashtable *out_width_map, list_t *hidden_expr_list = NULL);
+                                    iHashtable *out_width_map, list_t *hidden_expr_list = nullptr);
 
     /**
      * C-STRING MODE - set of expr - with copy on output for non unique outputs/hidden expressions
@@ -256,8 +257,8 @@ class ExternalExprOpt {
      */
     ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map,
                                     iHashtable *in_width_map, list_t *out_expr_list, list_t *out_expr_name_list,
-                                    iHashtable *out_width_map, list_t *hidden_expr_list = NULL,
-                                    list_t *hidden_expr_name_list = NULL);
+                                    iHashtable *out_width_map, list_t *hidden_expr_list = nullptr,
+                                    list_t *hidden_expr_name_list = nullptr);
 
     /**
      * Construct a new External Exp Opt generator, supply it with all the settings needed.
@@ -271,11 +272,11 @@ class ExternalExprOpt {
      * @param block_prefix the prefix for the expression block - if integer id mode is used
      */
     ExternalExprOpt(const expr_mapping_software datapath_syntesis_tool, const expr_mapping_target mapping_target,
-                    const bool tie_cells, const std::string expr_file_path = "", const std::string exprid_prefix = "e",
-                    const std::string block_prefix = "blk")
-        : expr_output_file(expr_file_path)
-        , expr_prefix(exprid_prefix)
-        , module_prefix(block_prefix)
+                    const bool tie_cells, std::string expr_file_path = "", std::string exprid_prefix = "e",
+                    std::string block_prefix = "blk")
+        : expr_output_file(std::move(expr_file_path))
+        , expr_prefix(std::move(exprid_prefix))
+        , module_prefix(std::move(block_prefix))
         , mapper(datapath_syntesis_tool)
         , use_tie_cells(tie_cells)
         , wire_encoding(mapping_target) {
@@ -317,7 +318,7 @@ class ExternalExprOpt {
      * @param log_file_name the log file, acutally the base name the individual reports are speperate for each case
      * @return ExprBlockInfo* the datastructure with the result data
      */
-    ExprBlockInfo *parse_genus_log(std::string log_file_name);
+    ExprBlockInfo *parse_genus_log(const std::string &log_file_name);
 
   private:
     bool cleanup;
@@ -346,7 +347,7 @@ class ExternalExprOpt {
      */
     void print_expr_verilog(FILE *output_stream, const char *expr_set_name, list_t *in_list, iHashtable *inexprmap,
                             iHashtable *inwidthmap, list_t *out_list, list_t *out_name_list, iHashtable *outwidthmap,
-                            list_t *expr_list = NULL, list_t *hidden_name_list = NULL);
+                            list_t *expr_list = nullptr, list_t *hidden_name_list = nullptr);
 
     /**
      * the generator for the genus run scripts.
@@ -357,7 +358,7 @@ class ExternalExprOpt {
      * @param process_name the name of the top level verilog module.
      */
     void generate_genus_tcl(const char *tcl_file_name, const char *file_name, const char *out_file_name,
-                            const char *process_name);
+                            const char *process_name) const;
 
     /**
      * the recursive method to print the expression itself as the rhs of a verilog assign.

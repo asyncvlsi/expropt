@@ -27,14 +27,14 @@
 #include <act/exproptcommercial.h>
 #endif
 
-#include <string.h>
+#include <cstring>
 
 /**
  * Destroy the External Expr Opt:: External Expr Opt object
  *
  * no memory allocation on global vars, nothing to be done
  */
-ExternalExprOpt::~ExternalExprOpt() {}
+ExternalExprOpt::~ExternalExprOpt() = default;
 
 /*
  * the a wrapper for chp2prs to just run the optimisation with a single expression,
@@ -51,7 +51,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int target
 
     // convert input list, reverse searching nessesary, should always use last on multimatching
     listitem_t *li;
-    Expr *e = NULL;
+    Expr *e = nullptr;
     for (li = list_first(in_expr_list); li; li = list_next(li)) {
         e = (Expr *)const_cast<void *>(list_value(li));
         // change from int to C string
@@ -103,7 +103,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /
 
     // convert input list, reverse searching nessesary, should always use last on multimatching
     listitem_t *li;
-    Expr *e = NULL;
+    Expr *e = nullptr;
     for (li = list_first(in_list); li; li = list_next(li)) {
         int i;
         ihash_bucket_t *b_search;
@@ -185,7 +185,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list
     // build the data structures need
     ExprBlockInfo *info;
     list_t *out_name_list = list_new();
-    list_t *hidden_name_list = NULL;
+    list_t *hidden_name_list = nullptr;
     listitem_t *li;
     if (hidden_expr_list) {
         hidden_name_list = list_new();
@@ -220,12 +220,12 @@ static struct cell_info {
     const char *name;
     double area;
     int count;
-} _cell_info[] = {{"AND2X1", 32, 0}, {"AND2X2", 32, 0}, {"AOI21X1", 32, 0}, {"AND2X1", 32, 0},   {"AOI22X2", 40, 0},
-                  {"BUFX2", 24, 0},  {"BUFX4", 32, 0},  {"CLKBUF1", 72, 0}, {"CLKBUF2", 104, 0}, {"CLKBUF3", 136, 0},
-                  {"FAX1", 120, 0},  {"HAX1", 80, 0},   {"INVX1", 16, 0},   {"INVX2", 16, 0},    {"INVX4", 24, 0},
-                  {"INVX8", 40, 0},  {"LATCH", 16, 0},  {"MUX2X1", 48, 0},  {"NAND2X1", 24, 0},  {"NAND3X1", 36, 0},
-                  {"NOR2X1", 24, 0}, {"NOR3X1", 64, 0}, {"OAI21X1", 24, 0}, {"OAI22X1", 40, 0},  {"OR2X1", 32, 0},
-                  {"OR2X2", 32, 0},  {"TBUFX1", 40, 0}, {"TBUFX2", 56, 0},  {"XNOR2X1", 56, 0},  {"XOR2X1", 56, 0}};
+} s_cell_info[] = {{"AND2X1", 32, 0}, {"AND2X2", 32, 0}, {"AOI21X1", 32, 0}, {"AND2X1", 32, 0},   {"AOI22X2", 40, 0},
+                   {"BUFX2", 24, 0},  {"BUFX4", 32, 0},  {"CLKBUF1", 72, 0}, {"CLKBUF2", 104, 0}, {"CLKBUF3", 136, 0},
+                   {"FAX1", 120, 0},  {"HAX1", 80, 0},   {"INVX1", 16, 0},   {"INVX2", 16, 0},    {"INVX4", 24, 0},
+                   {"INVX8", 40, 0},  {"LATCH", 16, 0},  {"MUX2X1", 48, 0},  {"NAND2X1", 24, 0},  {"NAND3X1", 36, 0},
+                   {"NOR2X1", 24, 0}, {"NOR3X1", 64, 0}, {"OAI21X1", 24, 0}, {"OAI22X1", 40, 0},  {"OR2X1", 32, 0},
+                   {"OR2X2", 32, 0},  {"TBUFX1", 40, 0}, {"TBUFX2", 56, 0},  {"XNOR2X1", 56, 0},  {"XOR2X1", 56, 0}};
 
 static double parse_abc_info(const char *file, double *area) {
     char buf[10240];
@@ -239,8 +239,8 @@ static double parse_abc_info(const char *file, double *area) {
     }
 
     ret = -1;
-    for (int i = 0; i < (ssize_t)(sizeof(_cell_info) / sizeof(_cell_info[0])); i++) {
-        _cell_info[i].count = 0;
+    for (auto &i : s_cell_info) {
+        i.count = 0;
     }
 
     while (fgets(buf, 10240, fp)) {
@@ -274,9 +274,9 @@ static double parse_abc_info(const char *file, double *area) {
                 }
                 if (*tmp && count > 0) {
                     int i;
-                    for (i = 0; i < (ssize_t)(sizeof(_cell_info) / sizeof(_cell_info[0])); i++) {
-                        if (strcmp(cell_name, _cell_info[i].name) == 0) {
-                            _cell_info[i].count++;
+                    for (i = 0; i < (ssize_t)(sizeof(s_cell_info) / sizeof(s_cell_info[0])); i++) {
+                        if (strcmp(cell_name, s_cell_info[i].name) == 0) {
+                            s_cell_info[i].count++;
                             break;
                         }
                     }
@@ -290,8 +290,8 @@ static double parse_abc_info(const char *file, double *area) {
     if (area) {
         int i;
         *area = 0;
-        for (i = 0; i < (ssize_t)(sizeof(_cell_info) / sizeof(_cell_info[0])); i++) {
-            *area += _cell_info[i].area * _cell_info[i].count;
+        for (i = 0; i < (ssize_t)(sizeof(s_cell_info) / sizeof(s_cell_info[0])); i++) {
+            *area += s_cell_info[i].area * s_cell_info[i].count;
         }
     }
     return ret;
@@ -308,12 +308,12 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list
                                                  list_t *out_expr_list, list_t *out_expr_name_list,
                                                  iHashtable *out_width_map, list_t *hidden_expr_list,
                                                  list_t *hidden_expr_name_list) {
-    ExprBlockInfo *info = NULL;
+    ExprBlockInfo *info = nullptr;
     // consruct files names for the temp files
     std::string verilog_file = ".";
     verilog_file.append("/exprop_");
     verilog_file.append(expr_set_name);
-    std::string mapped_file = verilog_file.data();
+    std::string mapped_file = verilog_file;
     verilog_file.append(".v");
     mapped_file.append("_mapped.v");
     char cmd[4096] = "";
@@ -430,7 +430,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list
     // read the resulting netlist and map it back to act, if the wire_type is not bool use the async mode the specify a
     // wire type as a channel. skip if run was just for extraction of properties => output filename empty
     if (!expr_output_file.empty()) {
-        if (expr_channel_type.compare("bool") != 0)
+        if (expr_channel_type != "bool")
             sprintf(cmd, "v2act -a -C \"%s\" -l %s -n %s %s >> %s", expr_channel_type.data(), cell_act_file.data(),
                     cell_namespace.data(), mapped_file.data(), expr_output_file.data());
         else
@@ -564,7 +564,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
         // omit ports with the same name
         for (li_search = list_next(li); li_search; li_search = list_next(li_search)) {
             std::string search = (char *)ihash_lookup(inexprmap, (long)list_value(li_search))->v;
-            if (current.compare(search) == 0) {
+            if (current == search) {
                 skip = true;
                 break;
             }
@@ -585,7 +585,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
         // omit ports with the same name
         for (li_search = list_next(li_name); li_search; li_search = list_next(li_search)) {
             std::string search = (char *)const_cast<void *>(list_value(li_search));
-            if (current.compare(search) == 0) {
+            if (current == search) {
                 skip = true;
                 break;
             }
@@ -605,7 +605,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
         bool skip = false;
         for (li_search = list_next(li); li_search; li_search = list_next(li_search)) {
             std::string search = (char *)ihash_lookup(inexprmap, (long)list_value(li_search))->v;
-            if (current.compare(search) == 0) {
+            if (current == search) {
                 skip = true;
                 break;
             }
@@ -634,7 +634,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
         // omit ports with the same name
         for (li_search = list_next(li_name); li_search; li_search = list_next(li_search)) {
             std::string search = (char *)const_cast<void *>(list_value(li_search));
-            if (current.compare(search) == 0) {
+            if (current == search) {
                 skip = true;
                 break;
             }
@@ -653,7 +653,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
     }
 
     // the hidden logic statements
-    if (expr_list != NULL && hidden_expr_name_list != NULL && !list_isempty(expr_list) &&
+    if (expr_list != nullptr && hidden_expr_name_list != nullptr && !list_isempty(expr_list) &&
         !list_isempty(hidden_expr_name_list)) {
         li_name = list_first(hidden_expr_name_list);
         fprintf(output_stream, "\n\t// the hidden logic vars declare\n");
@@ -665,7 +665,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
             // omit ports with the same name
             for (li_search = list_next(li_name); li_search; li_search = list_next(li_search)) {
                 std::string search = (char *)const_cast<void *>(list_value(li_search));
-                if (current.compare(search) == 0) {
+                if (current == search) {
                     skip = true;
                     break;
                 }
@@ -686,7 +686,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
     }
 
     // the hidden logic statements
-    if (expr_list != NULL && hidden_expr_name_list != NULL && !list_isempty(expr_list) &&
+    if (expr_list != nullptr && hidden_expr_name_list != nullptr && !list_isempty(expr_list) &&
         !list_isempty(hidden_expr_name_list)) {
         li_name = list_first(hidden_expr_name_list);
         fprintf(output_stream, "\n\t// the hidden logic statements as assigns\n");
@@ -698,7 +698,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
             // omit ports with the same name
             for (li_search = list_next(li_name); li_search; li_search = list_next(li_search)) {
                 std::string search = (char *)const_cast<void *>(list_value(li_search));
-                if (current.compare(search) == 0) {
+                if (current == search) {
                     skip = true;
                     break;
                 }
@@ -999,7 +999,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
  * generate the genus tlc script. should be a seperate file and regulated by a compile flag.
  */
 void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *file_name, const char *out_file_name,
-                                         const char *process_name) {
+                                         const char *process_name) const {
     // open the tcl file for writing
     FILE *tcl_file;
     if (tcl_file_name) {
@@ -1012,7 +1012,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
     }
 
     // the configuration variables for reuse
-    char *configreturn = NULL, *configreturn2 = NULL, *configreturn3 = NULL;
+    char *configreturn = nullptr, *configreturn2 = nullptr, *configreturn3 = nullptr;
     fprintf(tcl_file, "# generated genus run file for %s\n\n", process_name);
 
     // print the search paths if the files just have filenames not a full path
@@ -1219,7 +1219,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
 /*
  * work in progress have to swicht to fscanf for float probably.
  */
-ExprBlockInfo *ExternalExprOpt::parse_genus_log(std::string base_file_name) {
+ExprBlockInfo *ExternalExprOpt::parse_genus_log(const std::string &base_file_name) {
     std::string regex_power(" Subtotal %*f %*f %*f %lf");
     std::string regex_power_dynamic(" Subtotal %*f %*f %lf %*f");
     std::string regex_power_static(" Subtotal %lf %*f %*f %*f");
@@ -1292,7 +1292,7 @@ double ExternalExprOpt::parse_and_return_max(std::string filename, std::string p
             fatal_error("could not open file %s for reading", filename.data());
         return failure_value;
     }
-    std::string current_line = "";
+    std::string current_line;
     double return_value = failure_value;
     double value_buffer = 0;
     bool first = true;
