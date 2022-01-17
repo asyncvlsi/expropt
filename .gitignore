@@ -13,3 +13,6 @@ config.mk
 *.so
 .cproject
 .project
+.idea/
+cmake-build-debug
+build/
