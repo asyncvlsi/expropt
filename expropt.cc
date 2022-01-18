@@ -20,57 +20,57 @@
  **************************************************************************/
 
 #include "expropt.h"
+#include <cassert>
 #include <cstring>
 #include <fstream>
 #include <list>
-#include <cassert>
 
 #ifdef FOUND_exproptcommercial
 #include <act/exproptcommercial.h>
 #endif
 
 namespace {
-    template <typename T> std::list<T> to_list(list_t *l) {
-        static_assert(std::is_pointer_v<T>);
-        std::list<T> result;
-        for (auto li = list_first(l); li; li = list_next(li))
-            result.push_back((T) const_cast<void *> list_value(li));
-        return result;
+template <typename T> std::list<T> to_list(list_t *l) {
+    static_assert(std::is_pointer_v<T>);
+    std::list<T> result;
+    for (auto li = list_first(l); li; li = list_next(li))
+        result.push_back((T) const_cast<void *> list_value(li));
+    return result;
+}
+std::list<std::pair<int, int>> to_int_pair_list(list_t *l) {
+    std::list<std::pair<int, int>> result;
+    for (auto li = list_first(l); li; li = list_next(li)) {
+        auto t1 = list_ivalue(li);
+        li = list_next(li);
+        auto t2 = list_ivalue(li);
+        result.emplace_back(t1, t2);
     }
-    std::list<std::pair<int, int>> to_int_pair_list(list_t *l) {
-        std::list<std::pair<int, int>> result;
-        for (auto li = list_first(l); li; li = list_next(li)) {
-            auto t1 = list_ivalue(li);
-            li = list_next(li);
-            auto t2 = list_ivalue(li);
-            result.emplace_back(t1, t2);
-        }
-        return result;
+    return result;
+}
+template <typename K, typename V> std::unordered_map<K, V> to_map(iHashtable *table) {
+    static_assert(std::is_pointer_v<V>);
+    static_assert(std::is_pointer_v<K>);
+    std::unordered_map<K, V> result;
+    ihash_iter_t iter;
+    ihash_bucket_t *ib;
+    ihash_iter_init(table, &iter);
+    while ((ib = ihash_iter_next(table, &iter))) {
+        result[(K)ib->key] = (V)ib->v;
     }
-    template <typename K, typename V> std::unordered_map<K, V> to_map(iHashtable *table) {
-        static_assert(std::is_pointer_v<V>);
-        static_assert(std::is_pointer_v<K>);
-        std::unordered_map<K, V> result;
-        ihash_iter_t iter;
-        ihash_bucket_t *ib;
-        ihash_iter_init(table, &iter);
-        while ((ib = ihash_iter_next(table, &iter))) {
-            result[(K)ib->key] = (V)ib->v;
-        }
-        return result;
+    return result;
+}
+template <typename K, typename V> std::unordered_map<K, int> to_imap(iHashtable *table) {
+    static_assert(std::is_pointer_v<K>);
+    static_assert(std::is_same_v<V, int>);
+    std::unordered_map<K, int> result;
+    ihash_iter_t iter;
+    ihash_bucket_t *ib;
+    ihash_iter_init(table, &iter);
+    while ((ib = ihash_iter_next(table, &iter))) {
+        result[(K)ib->key] = ib->i;
     }
-    template <typename K, typename V> std::unordered_map<K, int> to_imap(iHashtable *table) {
-        static_assert(std::is_pointer_v<K>);
-        static_assert(std::is_same_v<V, int>);
-        std::unordered_map<K, int> result;
-        ihash_iter_t iter;
-        ihash_bucket_t *ib;
-        ihash_iter_init(table, &iter);
-        while ((ib = ihash_iter_next(table, &iter))) {
-            result[(K)ib->key] = ib->i;
-        }
-        return result;
-    }
+    return result;
+}
 } // namespace
 
 /**
@@ -81,18 +81,18 @@ namespace {
 ExternalExprOpt::~ExternalExprOpt() = default;
 
 // the a wrapper for chp2prs to just run the optimisation with a single expression,
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth, Expr *expr,
-                                                 std::list<Expr *> in_expr_list,
-                                                 std::unordered_map<Expr *, int> in_expr_map,
-                                                 std::unordered_map<Expr *, int> in_width_map) {
+ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth, const Expr *expr,
+                                                 const std::list<const Expr *> &in_expr_list,
+                                                 const std::unordered_map<const Expr *, int> &in_expr_map,
+                                                 const std::unordered_map<const Expr *, int> &in_width_map) {
     // build the data structures need
-    std::unordered_map<Expr *, const char *> outexprmap;
-    std::unordered_map<Expr *, const char *> inexprmap;
-    std::unordered_map<Expr *, int> outwidthmap;
-    std::list<Expr *> outlist;
+    std::unordered_map<const Expr *, const char *> outexprmap;
+    std::unordered_map<const Expr *, const char *> inexprmap;
+    std::unordered_map<const Expr *, int> outwidthmap;
+    std::list<const Expr *> outlist;
 
     // convert input list, reverse searching nessesary, should always use last on multimatching
-    for (Expr *e : in_expr_list) {
+    for (const Expr *e : in_expr_list) {
         // change from int to C string
         char *charbuf = (char *)malloc(sizeof(char) * (1024 + 1));
         sprintf(charbuf, "%s%u", expr_prefix.data(), in_expr_map.at(e));
@@ -111,20 +111,20 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int target
     // and send off
     return run_external_opt(expr_set_name, in_expr_list, inexprmap, in_width_map, outlist, outexprmap, outwidthmap);
 }
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth, Expr *expr, list_t *in_expr_list,
-                                                 iHashtable *in_expr_map, iHashtable *in_width_map) {
-    return run_external_opt(expr_set_number, targetwidth, expr, to_list<Expr *>(in_expr_list),
-                            to_imap<Expr *, int>(in_expr_map), to_imap<Expr *, int>(in_width_map));
+ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth, const Expr *expr,
+                                                 list_t *in_expr_list, iHashtable *in_expr_map,
+                                                 iHashtable *in_width_map) {
+    return run_external_opt(expr_set_number, targetwidth, expr, to_list<const Expr *>(in_expr_list),
+                            to_imap<const Expr *, int>(in_expr_map), to_imap<const Expr *, int>(in_width_map));
 }
 
 /*
  * the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to
  * ExprOpt standart
  */
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, std::list<Expr *> /*expr_list*/,
-                                                 std::list<std::pair<int, int>> in_list,
-                                                 std::list<std::pair<int, int>> out_list,
-                                                 std::unordered_map<Expr *, int> exprmap_int) {
+ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std::list<std::pair<int, int>> &in_list,
+                                                 const std::list<std::pair<int, int>> &out_list,
+                                                 const std::unordered_map<const Expr *, int> &exprmap_int) {
     // build the data structures need
     ExprBlockInfo *info;
     iHashtable *inexprmap = ihash_new(0);
@@ -135,7 +135,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, std::list<
     list_t *inlist = list_new();
 
     // Note: all the values in exprmap_int must be unique
-    std::unordered_map<int, Expr *> exprmap_int_inv;
+    std::unordered_map<int, const Expr *> exprmap_int_inv;
     for (auto &[k, v] : exprmap_int) {
         assert(!exprmap_int_inv.contains(v));
         exprmap_int_inv[v] = k;
@@ -143,7 +143,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, std::list<
 
     // convert input list, reverse searching nessesary, should always use last on multimatching
     for (const auto &[li, li_width] : in_list) {
-        Expr *e = exprmap_int_inv.at(li);
+        const Expr *e = exprmap_int_inv.at(li);
         assert(e);
         ihash_bucket_t *b_map;
         char *charbuf = (char *)malloc(sizeof(char) * (1024 + 1));
@@ -157,7 +157,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, std::list<
     }
     // do the exact same for the outlist!
     for (const auto &[li, li_width] : out_list) {
-        Expr *e = exprmap_int_inv.at(li);
+        const Expr *e = exprmap_int_inv.at(li);
         assert(e);
         ihash_bucket_t *b_map;
         char *charbuf = (char *)malloc(sizeof(char) * (1024 + 1));
@@ -183,10 +183,10 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, std::list<
     ihash_free(outwidthmap);
     return info;
 }
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t *expr_list, list_t *in_list,
+ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/, list_t *in_list,
                                                  list_t *out_list, iHashtable *exprmap_int) {
-    return run_external_opt(expr_set_number, to_list<Expr *>(expr_list), to_int_pair_list(in_list),
-                            to_int_pair_list(out_list), to_imap<Expr *, int>(exprmap_int));
+    return run_external_opt(expr_set_number, to_int_pair_list(in_list), to_int_pair_list(out_list),
+                            to_imap<const Expr *, int>(exprmap_int));
 }
 
 /**
@@ -199,26 +199,26 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list
                                                  iHashtable *in_expr_map, iHashtable *in_width_map,
                                                  list_t *out_expr_list, iHashtable *out_expr_map,
                                                  iHashtable *out_width_map, list_t *hidden_expr_list) {
-    return run_external_opt(expr_set_name, to_list<Expr *>(in_expr_list), to_map<Expr *, const char *>(in_expr_map),
-                            to_imap<Expr *, int>(in_width_map), to_list<Expr *>(out_expr_list),
-                            to_map<Expr *, const char *>(out_expr_map), to_imap<Expr *, int>(out_width_map),
-                            to_list<Expr *>(hidden_expr_list));
+    return run_external_opt(expr_set_name, to_list<const Expr *>(in_expr_list),
+                            to_map<const Expr *, const char *>(in_expr_map), to_imap<const Expr *, int>(in_width_map),
+                            to_list<const Expr *>(out_expr_list), to_map<const Expr *, const char *>(out_expr_map),
+                            to_imap<const Expr *, int>(out_width_map), to_list<const Expr *>(hidden_expr_list));
 }
-ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, std::list<Expr *> in_expr_list,
-                                                 std::unordered_map<Expr *, const char *> in_expr_map,
-                                                 std::unordered_map<Expr *, int> in_width_map,
-                                                 std::list<Expr *> out_expr_list,
-                                                 std::unordered_map<Expr *, const char *> out_expr_map,
-                                                 std::unordered_map<Expr *, int> out_width_map,
-                                                 std::list<Expr *> hidden_expr_list) {
+ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, const std::list<const Expr *> &in_expr_list,
+                                                 const std::unordered_map<const Expr *, const char *> &in_expr_map,
+                                                 const std::unordered_map<const Expr *, int> &in_width_map,
+                                                 const std::list<const Expr *> &out_expr_list,
+                                                 const std::unordered_map<const Expr *, const char *> &out_expr_map,
+                                                 const std::unordered_map<const Expr *, int> &out_width_map,
+                                                 const std::list<const Expr *> &hidden_expr_list) {
 
     // build the data structures need
     std::list<const char *> out_name_list, hidden_name_list;
 
-    for (Expr *li : out_expr_list) {
+    for (const Expr *li : out_expr_list) {
         out_name_list.push_back(out_expr_map.at(li));
     }
-    for (Expr *li : hidden_expr_list) {
+    for (const Expr *li : hidden_expr_list) {
         hidden_name_list.push_back(out_expr_map.at(li));
     }
 
@@ -226,90 +226,90 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, std:
                             out_width_map, hidden_expr_list, hidden_name_list);
 }
 namespace {
-    double parse_abc_info(const char *file, double *area) {
-        char buf[10240];
-        FILE *fp;
-        double ret;
+double parse_abc_info(const char *file, double *area) {
+    char buf[10240];
+    FILE *fp;
+    double ret;
 
-        // This is a hack, fix this later...
-        // Taken from OSU .lib file
-        struct cell_info {
-            const char *name;
-            double area;
-            int count;
-        };
-        cell_info cell_infos[] = {
-                {"AND2X1", 32, 0}, {"AND2X2", 32, 0}, {"AOI21X1", 32, 0}, {"AND2X1", 32, 0},   {"AOI22X2", 40, 0},
-                {"BUFX2", 24, 0},  {"BUFX4", 32, 0},  {"CLKBUF1", 72, 0}, {"CLKBUF2", 104, 0}, {"CLKBUF3", 136, 0},
-                {"FAX1", 120, 0},  {"HAX1", 80, 0},   {"INVX1", 16, 0},   {"INVX2", 16, 0},    {"INVX4", 24, 0},
-                {"INVX8", 40, 0},  {"LATCH", 16, 0},  {"MUX2X1", 48, 0},  {"NAND2X1", 24, 0},  {"NAND3X1", 36, 0},
-                {"NOR2X1", 24, 0}, {"NOR3X1", 64, 0}, {"OAI21X1", 24, 0}, {"OAI22X1", 40, 0},  {"OR2X1", 32, 0},
-                {"OR2X2", 32, 0},  {"TBUFX1", 40, 0}, {"TBUFX2", 56, 0},  {"XNOR2X1", 56, 0},  {"XOR2X1", 56, 0}};
+    // This is a hack, fix this later...
+    // Taken from OSU .lib file
+    struct cell_info {
+        const char *name;
+        double area;
+        int count;
+    };
+    cell_info cell_infos[] = {
+        {"AND2X1", 32, 0}, {"AND2X2", 32, 0}, {"AOI21X1", 32, 0}, {"AND2X1", 32, 0},   {"AOI22X2", 40, 0},
+        {"BUFX2", 24, 0},  {"BUFX4", 32, 0},  {"CLKBUF1", 72, 0}, {"CLKBUF2", 104, 0}, {"CLKBUF3", 136, 0},
+        {"FAX1", 120, 0},  {"HAX1", 80, 0},   {"INVX1", 16, 0},   {"INVX2", 16, 0},    {"INVX4", 24, 0},
+        {"INVX8", 40, 0},  {"LATCH", 16, 0},  {"MUX2X1", 48, 0},  {"NAND2X1", 24, 0},  {"NAND3X1", 36, 0},
+        {"NOR2X1", 24, 0}, {"NOR3X1", 64, 0}, {"OAI21X1", 24, 0}, {"OAI22X1", 40, 0},  {"OR2X1", 32, 0},
+        {"OR2X2", 32, 0},  {"TBUFX1", 40, 0}, {"TBUFX2", 56, 0},  {"XNOR2X1", 56, 0},  {"XOR2X1", 56, 0}};
 
-        snprintf(buf, 10240, "%s.log", file);
-        fp = fopen(buf, "r");
-        if (!fp) {
-            return -1;
-        }
+    snprintf(buf, 10240, "%s.log", file);
+    fp = fopen(buf, "r");
+    if (!fp) {
+        return -1;
+    }
 
-        ret = -1;
-        for (auto &i : cell_infos) {
-            i.count = 0;
-        }
+    ret = -1;
+    for (auto &i : cell_infos) {
+        i.count = 0;
+    }
 
-        while (fgets(buf, 10240, fp)) {
-            if (strncmp(buf, "ABC:", 4) == 0) {
-                char *tmp = strstr(buf, "Delay =");
-                if (tmp) {
-                    if (sscanf(tmp, "Delay = %lf ps", &ret) == 1) {
-                        ret = ret * 1e-12;
-                    }
+    while (fgets(buf, 10240, fp)) {
+        if (strncmp(buf, "ABC:", 4) == 0) {
+            char *tmp = strstr(buf, "Delay =");
+            if (tmp) {
+                if (sscanf(tmp, "Delay = %lf ps", &ret) == 1) {
+                    ret = ret * 1e-12;
                 }
-            } else if (strncmp(buf, "ABC RESULTS:", 12) == 0) {
-                char *tmp = buf + 12;
-                while (*tmp && isspace(*tmp)) {
+            }
+        } else if (strncmp(buf, "ABC RESULTS:", 12) == 0) {
+            char *tmp = buf + 12;
+            while (*tmp && isspace(*tmp)) {
+                tmp++;
+            }
+            if (*tmp) {
+                char *cell_name = tmp;
+                while (*tmp && !isspace(*tmp)) {
                     tmp++;
                 }
                 if (*tmp) {
-                    char *cell_name = tmp;
-                    while (*tmp && !isspace(*tmp)) {
-                        tmp++;
+                    *tmp = '\0';
+                    tmp++;
+                }
+                int count = -1;
+                if (strncmp(tmp, "cells:", 6) == 0) {
+                    tmp += 6;
+                    if (sscanf(tmp, "%d", &count) != 1) {
+                        count = -1;
                     }
-                    if (*tmp) {
-                        *tmp = '\0';
-                        tmp++;
-                    }
-                    int count = -1;
-                    if (strncmp(tmp, "cells:", 6) == 0) {
-                        tmp += 6;
-                        if (sscanf(tmp, "%d", &count) != 1) {
-                            count = -1;
+                }
+                if (*tmp && count > 0) {
+                    int i;
+                    for (i = 0; i < (ssize_t)(sizeof(cell_infos) / sizeof(cell_infos[0])); i++) {
+                        if (strcmp(cell_name, cell_infos[i].name) == 0) {
+                            cell_infos[i].count++;
+                            break;
                         }
                     }
-                    if (*tmp && count > 0) {
-                        int i;
-                        for (i = 0; i < (ssize_t)(sizeof(cell_infos) / sizeof(cell_infos[0])); i++) {
-                            if (strcmp(cell_name, cell_infos[i].name) == 0) {
-                                cell_infos[i].count++;
-                                break;
-                            }
-                        }
-                        // printf ("got cell %s, count = %d\n", cell_name, count);
-                        /* got cell count! */
-                        /* XXX: the area is in the .lib file... */
-                    }
+                    // printf ("got cell %s, count = %d\n", cell_name, count);
+                    /* got cell count! */
+                    /* XXX: the area is in the .lib file... */
                 }
             }
         }
-        if (area) {
-            int i;
-            *area = 0;
-            for (i = 0; i < (ssize_t)(sizeof(cell_infos) / sizeof(cell_infos[0])); i++) {
-                *area += cell_infos[i].area * cell_infos[i].count;
-            }
-        }
-        return ret;
     }
+    if (area) {
+        int i;
+        *area = 0;
+        for (i = 0; i < (ssize_t)(sizeof(cell_infos) / sizeof(cell_infos[0])); i++) {
+            *area += cell_infos[i].area * cell_infos[i].count;
+        }
+    }
+    return ret;
+}
 } // namespace
 
 /**
@@ -324,16 +324,20 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list
                                                  list_t *out_expr_list, list_t *out_expr_name_list,
                                                  iHashtable *out_width_map, list_t *hidden_expr_list,
                                                  list_t *hidden_expr_name_list) {
-    return run_external_opt(expr_set_name, to_list<Expr *>(in_expr_list), to_map<Expr *, const char *>(in_expr_map),
-                            to_imap<Expr *, int>(in_width_map), to_list<Expr *>(out_expr_list),
-                            to_list<const char *>(out_expr_name_list), to_imap<Expr *, int>(out_width_map),
-                            to_list<Expr *>(hidden_expr_list), to_list<const char *>(hidden_expr_name_list));
+    return run_external_opt(expr_set_name, to_list<const Expr *>(in_expr_list),
+                            to_map<const Expr *, const char *>(in_expr_map), to_imap<const Expr *, int>(in_width_map),
+                            to_list<const Expr *>(out_expr_list), to_list<const char *>(out_expr_name_list),
+                            to_imap<const Expr *, int>(out_width_map), to_list<const Expr *>(hidden_expr_list),
+                            to_list<const char *>(hidden_expr_name_list));
 }
-ExprBlockInfo *ExternalExprOpt::run_external_opt(
-        const char *expr_set_name, std::list<Expr *> in_expr_list, std::unordered_map<Expr *, const char *> in_expr_map,
-        std::unordered_map<Expr *, int> in_width_map, std::list<Expr *> out_expr_list,
-        std::list<const char *> out_expr_name_list, std::unordered_map<Expr *, int> out_width_map,
-        std::list<Expr *> hidden_expr_list, std::list<const char *> hidden_expr_name_list) {
+ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, const std::list<const Expr *> &in_expr_list,
+                                                 const std::unordered_map<const Expr *, const char *> &in_expr_map,
+                                                 const std::unordered_map<const Expr *, int> &in_width_map,
+                                                 const std::list<const Expr *> &out_expr_list,
+                                                 const std::list<const char *> &out_expr_name_list,
+                                                 const std::unordered_map<const Expr *, int> &out_width_map,
+                                                 const std::list<const Expr *> &hidden_expr_list,
+                                                 const std::list<const char *> &hidden_expr_name_list) {
     ExprBlockInfo *info = nullptr;
     // consruct files names for the temp files
     std::string verilog_file = ".";
@@ -374,83 +378,83 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(
 #endif
 
     switch (mapper) {
-        case genus:
+    case genus:
 #ifdef FOUND_exproptcommercial
-            if (expr_output_file.empty())
+        if (expr_output_file.empty())
             exec_failure = helper->run_genus(verilog_file, mapped_file, expr_set_name, true);
         else
             exec_failure = helper->run_genus(verilog_file, mapped_file, expr_set_name);
         break;
 #else
-            fatal_error("cadence genus support was not enabled on compile time");
-            break;
+        fatal_error("cadence genus support was not enabled on compile time");
+        break;
 #endif
 
-        case synopsis:
-            // would need a sample script to implement this
-            fatal_error("synopsis compiler is not implemented yet");
-            break;
-        case yosys: {
-            /* create a .sdc file to get delay values */
-            verilog_stream = fopen(sdc_file.data(), "w");
-            if (!verilog_stream) {
-                fatal_error("Could not open `%s' file!", sdc_file.data());
-            }
-            fprintf(verilog_stream, "set_load %g\n", config_get_real("expropt.default_load"));
-            fclose(verilog_stream);
+    case synopsis:
+        // would need a sample script to implement this
+        fatal_error("synopsis compiler is not implemented yet");
+        break;
+    case yosys: {
+        /* create a .sdc file to get delay values */
+        verilog_stream = fopen(sdc_file.data(), "w");
+        if (!verilog_stream) {
+            fatal_error("Could not open `%s' file!", sdc_file.data());
         }
-            // FALLTHROUGH
-        default:
-            // yosys gets its script passed via stdin (very short)
-            char *configreturn = config_get_string("expropt.liberty_tt_typtemp");
-            if (std::strcmp(configreturn, "none") != 0) {
-                int constr = 0;
-                if (config_exists("expropt.abc_use_constraints")) {
-                    if (config_get_int("expropt.abc_use_constraints") == 1) {
-                        constr = 1;
-                    }
+        fprintf(verilog_stream, "set_load %g\n", config_get_real("expropt.default_load"));
+        fclose(verilog_stream);
+    }
+        // FALLTHROUGH
+    default:
+        // yosys gets its script passed via stdin (very short)
+        char *configreturn = config_get_string("expropt.liberty_tt_typtemp");
+        if (std::strcmp(configreturn, "none") != 0) {
+            int constr = 0;
+            if (config_exists("expropt.abc_use_constraints")) {
+                if (config_get_int("expropt.abc_use_constraints") == 1) {
+                    constr = 1;
                 }
-                if (use_tie_cells) {
-                    if (constr) {
-                        sprintf(
-                                cmd,
-                                "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell "
-                                "TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-                                verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(),
-                                mapped_file.data());
-                    } else {
-                        sprintf(cmd,
-                                "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; hilomap -hicell TIEHIX1 Y "
-                                "-locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-                                verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
-                    }
-                } else {
-                    if (constr) {
-                        sprintf(cmd,
-                                "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; write_verilog  "
-                                "-nohex -nodec %s;\" | yosys > %s.log",
-                                verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(),
-                                mapped_file.data());
-                    } else {
-                        sprintf(cmd,
-                                "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex "
-                                "-nodec %s;\" | yosys > %s.log",
-                                verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
-                    }
-                }
-            } else
-                fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
-            if (config_get_int("expropt.verbose") == 2)
-                printf("running: %s \n", cmd);
-            else if (config_get_int("expropt.verbose") == 1) {
-                printf(".");
-                fflush(stdout);
             }
-            exec_failure = system(cmd);
-            if (exec_failure != 0)
-                fatal_error("yosys syntesis failed: \"%s\" failed.", cmd);
-            // @TODO do metadata extraction via ABC
-            break;
+            if (use_tie_cells) {
+                if (constr) {
+                    sprintf(
+                        cmd,
+                        "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell "
+                        "TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
+                        verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(),
+                        mapped_file.data());
+                } else {
+                    sprintf(cmd,
+                            "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; hilomap -hicell TIEHIX1 Y "
+                            "-locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
+                            verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+                }
+            } else {
+                if (constr) {
+                    sprintf(cmd,
+                            "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; write_verilog  "
+                            "-nohex -nodec %s;\" | yosys > %s.log",
+                            verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(),
+                            mapped_file.data());
+                } else {
+                    sprintf(cmd,
+                            "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex "
+                            "-nodec %s;\" | yosys > %s.log",
+                            verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+                }
+            }
+        } else
+            fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
+        if (config_get_int("expropt.verbose") == 2)
+            printf("running: %s \n", cmd);
+        else if (config_get_int("expropt.verbose") == 1) {
+            printf(".");
+            fflush(stdout);
+        }
+        exec_failure = system(cmd);
+        if (exec_failure != 0)
+            fatal_error("yosys syntesis failed: \"%s\" failed.", cmd);
+        // @TODO do metadata extraction via ABC
+        break;
     }
 
     // read the resulting netlist and map it back to act, if the wire_type is not bool use the async mode the specify a
@@ -474,9 +478,9 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(
     }
     // parce block info - WORK IN PROGRESS
     switch (mapper) {
-        case genus: {
+    case genus: {
 #ifdef FOUND_exproptcommercial
-            std::string genus_log = mapped_file.data();
+        std::string genus_log = mapped_file.data();
         info = new ExprBlockInfo(helper->parse_genus_log(genus_log, metadata_delay_typ),
                                  helper->parse_genus_log(genus_log, metadata_delay_min),
                                  helper->parse_genus_log(genus_log, metadata_delay_max),
@@ -488,34 +492,34 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(
                                  helper->parse_genus_log(genus_log, metadata_power_max_static),
                                  helper->parse_genus_log(genus_log, metadata_power_max_dynamic));
 #else
-            fatal_error("cadence genus support was not enabled on compile time");
+        fatal_error("cadence genus support was not enabled on compile time");
 #endif
-        } break;
-        case synopsis:
-            fatal_error("synopsis compiler are not implemented yet");
-            break;
-        case yosys:
-        default: {
-            double delay, area;
-            area = 0.0;
-            delay = parse_abc_info(mapped_file.data(), &area);
-            info = new ExprBlockInfo(delay, 0, 0, 0, 0, 0, 0, 0, 0, area);
-        } break;
+    } break;
+    case synopsis:
+        fatal_error("synopsis compiler are not implemented yet");
+        break;
+    case yosys:
+    default: {
+        double delay, area;
+        area = 0.0;
+        delay = parse_abc_info(mapped_file.data(), &area);
+        info = new ExprBlockInfo(delay, 0, 0, 0, 0, 0, 0, 0, 0, area);
+    } break;
     }
 
     // clean up temporary files
     if (cleanup) {
         switch (mapper) {
-            case genus:
-                sprintf(cmd, "rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm genus.*",
-                        mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data());
-                break;
-            case synopsis:
-            case yosys:
-            default:
-                sprintf(cmd, "rm %s && rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(),
-                        sdc_file.data(), mapped_file.data());
-                break;
+        case genus:
+            sprintf(cmd, "rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm genus.*",
+                    mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data());
+            break;
+        case synopsis:
+        case yosys:
+        default:
+            sprintf(cmd, "rm %s && rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(),
+                    sdc_file.data(), mapped_file.data());
+            break;
         }
         if (config_get_int("expropt.verbose") == 2)
             printf("running: %s \n", cmd);
@@ -562,12 +566,12 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(
 /*
  * print the verilog module with header, in and outputs. call the expression print method for the assigns rhs.
  */
-void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_set_name, std::list<Expr *> in_list,
-                                         std::unordered_map<Expr *, const char *> inexprmap,
-                                         std::unordered_map<Expr *, int> inwidthmap, std::list<Expr *> out_list,
-                                         std::list<const char *> out_expr_name_list,
-                                         std::unordered_map<Expr *, int> outwidthmap, std::list<Expr *> expr_list,
-                                         std::list<const char *> hidden_expr_name_list) {
+void ExternalExprOpt::print_expr_verilog(
+    FILE *output_stream, const char *expr_set_name, const std::list<const Expr *> &in_list,
+    const std::unordered_map<const Expr *, const char *> &inexprmap,
+    const std::unordered_map<const Expr *, int> &inwidthmap, const std::list<const Expr *> &out_list,
+    const std::list<const char *> &out_expr_name_list, const std::unordered_map<const Expr *, int> &outwidthmap,
+    const std::list<const Expr *> &expr_list, const std::list<const char *> &hidden_expr_name_list) {
     if (!output_stream)
         fatal_error("ExternalExprOpt::print_expr_verilog: verilog file is not writable");
 
@@ -645,7 +649,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
         int width = inwidthmap.at(*li);
         if (width <= 0)
             fatal_error(
-                    "ExternalExprOpt::print_expr_verilog error: Expression operands have incompatible bit widths\n");
+                "ExternalExprOpt::print_expr_verilog error: Expression operands have incompatible bit widths\n");
         else if (width == 1)
             fprintf(output_stream, "\tinput %s ;\n", current.data());
         else
@@ -677,7 +681,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
             int width = outwidthmap.at(*li);
             if (width <= 0)
                 fatal_error(
-                        "chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
+                    "chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
             else if (width == 1)
                 fprintf(output_stream, "\toutput %s ;\n", current.data());
             else
@@ -710,7 +714,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
             int width = outwidthmap.at(*li);
             if (width <= 0)
                 fatal_error(
-                        "chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
+                    "chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
             else if (width == 1)
                 fprintf(output_stream, "\twire %s ;\n", current.data());
             else
@@ -727,7 +731,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
 
         for (auto li = expr_list.begin(); li != expr_list.end(); ++li) {
             assert(expr_list.size() == hidden_expr_name_list.size());
-            Expr *e = *li;
+            const Expr *e = *li;
             std::string current = *li_name;
             bool skip = false;
             // omit ports with the same name
@@ -755,7 +759,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
         auto li_name = out_expr_name_list.begin();
         for (auto li = out_list.begin(); li != out_list.end(); ++li) {
             assert(li_name != out_expr_name_list.end());
-            Expr *e = *li;
+            const Expr *e = *li;
             std::string current = *li_name;
             fprintf(output_stream, "\tassign %s = ", current.data());
             print_expression(output_stream, e, inexprmap);
@@ -778,244 +782,244 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
  * the keys for the exprmaps are the pointers of the e of type E_VAR and optinal of E_INT, E_TRUE, E_FALSE (or E_REAL)
  * for dualrail. if a mapping exsists for these leaf types the mapping will be prefered over printing the value.
  */
-void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
-                                       std::unordered_map<Expr *, const char *> exprmap) {
+void ExternalExprOpt::print_expression(FILE *output_stream, const Expr *e,
+                                       const std::unordered_map<const Expr *, const char *> &exprmap) {
     fprintf(output_stream, "(");
     switch (e->type) {
-        case E_BUILTIN_BOOL:
+    case E_BUILTIN_BOOL:
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " == 0 ? 1'b0 : 1'b1");
+        break;
+
+    case E_BUILTIN_INT:
+        if (!e->u.e.r) {
             print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " == 0 ? 1'b0 : 1'b1");
-            break;
-
-        case E_BUILTIN_INT:
-            if (!e->u.e.r) {
-                print_expression(output_stream, e->u.e.l, exprmap);
-            } else {
-                int v;
-                print_expression(output_stream, e->u.e.l, exprmap);
-                fprintf(output_stream, " & ");
-                v = e->u.e.r->u.v;
-                fprintf(output_stream, "%d'b", v);
-                for (int i = 0; i < v; i++) {
-                    fprintf(output_stream, "1");
-                }
-            }
-            break;
-
-        case (E_AND):
+        } else {
+            int v;
             print_expression(output_stream, e->u.e.l, exprmap);
             fprintf(output_stream, " & ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_OR):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " | ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_NOT):
-            fprintf(output_stream, " ~");
-            print_expression(output_stream, e->u.e.l, exprmap);
-            break;
-        case (E_PLUS):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " + ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_MINUS):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " - ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_MULT):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " * ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_DIV):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " / ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_MOD):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " %% ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_LSL):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " << ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_LSR):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " >> ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_ASR):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " >>> ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_UMINUS):
-            fprintf(output_stream, " (-");
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, ")");
-            break;
-        case (E_INT): {
-            auto b = exprmap.find(e);
-            if (b != exprmap.end())
-                fprintf(output_stream, "%s", b->second);
-            else {
-                fprintf(output_stream, "64'd%lu", e->u.v);
+            v = e->u.e.r->u.v;
+            fprintf(output_stream, "%d'b", v);
+            for (int i = 0; i < v; i++) {
+                fprintf(output_stream, "1");
             }
         }
+        break;
 
-            break;
-        case (E_VAR): {
-            fprintf(output_stream, "%s", exprmap.at(e));
-        } break;
-        case (E_QUERY):
+    case (E_AND):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " & ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_OR):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " | ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_NOT):
+        fprintf(output_stream, " ~");
+        print_expression(output_stream, e->u.e.l, exprmap);
+        break;
+    case (E_PLUS):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " + ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_MINUS):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " - ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_MULT):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " * ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_DIV):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " / ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_MOD):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " %% ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_LSL):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " << ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_LSR):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " >> ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_ASR):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " >>> ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_UMINUS):
+        fprintf(output_stream, " (-");
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, ")");
+        break;
+    case (E_INT): {
+        auto b = exprmap.find(e);
+        if (b != exprmap.end())
+            fprintf(output_stream, "%s", b->second);
+        else {
+            fprintf(output_stream, "64'd%lu", e->u.v);
+        }
+    }
+
+    break;
+    case (E_VAR): {
+        fprintf(output_stream, "%s", exprmap.at(e));
+    } break;
+    case (E_QUERY):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " ? ");
+        print_expression(output_stream, e->u.e.r->u.e.l, exprmap);
+        fprintf(output_stream, " : ");
+        print_expression(output_stream, e->u.e.r->u.e.r, exprmap);
+        break;
+    case (E_LPAR):
+        fprintf(output_stream, "LPAR\n");
+        fatal_error("%u not implemented", e->type);
+        break;
+    case (E_RPAR):
+        fprintf(output_stream, "RPAR\n");
+        fatal_error("%u not implemented", e->type);
+        break;
+    case (E_XOR):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " ^ ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_LT):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " < ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_GT):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " > ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_LE):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " <=");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_GE):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " >= ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_EQ):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " == ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_NE):
+        print_expression(output_stream, e->u.e.l, exprmap);
+        fprintf(output_stream, " != ");
+        print_expression(output_stream, e->u.e.r, exprmap);
+        break;
+    case (E_TRUE): {
+        auto b = exprmap.find(e);
+        if (b != exprmap.end())
+            fprintf(output_stream, "%s", b->second);
+        else
+            fprintf(output_stream, " 1'b1 ");
+    } break;
+    case (E_FALSE): {
+        auto b = exprmap.find(e);
+        if (b != exprmap.end())
+            fprintf(output_stream, "%s", b->second);
+        else
+            fprintf(output_stream, " 1'b0 ");
+    } break;
+    case (E_COLON):
+        fprintf(output_stream, " : ");
+        break;
+    case (E_PROBE):
+        fprintf(output_stream, "PROBE");
+        fatal_error("%u should have been handled else where", e->type);
+        break;
+    case (E_COMMA):
+        fprintf(output_stream, "COMMA");
+        fatal_error("%u should have been handled else where", e->type);
+        break;
+    case (E_CONCAT):
+        if (!e->u.e.r) {
             print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " ? ");
-            print_expression(output_stream, e->u.e.r->u.e.l, exprmap);
-            fprintf(output_stream, " : ");
-            print_expression(output_stream, e->u.e.r->u.e.r, exprmap);
-            break;
-        case (E_LPAR):
-            fprintf(output_stream, "LPAR\n");
-            fatal_error("%u not implemented", e->type);
-            break;
-        case (E_RPAR):
-            fprintf(output_stream, "RPAR\n");
-            fatal_error("%u not implemented", e->type);
-            break;
-        case (E_XOR):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " ^ ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_LT):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " < ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_GT):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " > ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_LE):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " <=");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_GE):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " >= ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_EQ):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " == ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_NE):
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " != ");
-            print_expression(output_stream, e->u.e.r, exprmap);
-            break;
-        case (E_TRUE): {
-            auto b = exprmap.find(e);
-            if (b != exprmap.end())
-                fprintf(output_stream, "%s", b->second);
-            else
-                fprintf(output_stream, " 1'b1 ");
-        } break;
-        case (E_FALSE): {
-            auto b = exprmap.find(e);
-            if (b != exprmap.end())
-                fprintf(output_stream, "%s", b->second);
-            else
-                fprintf(output_stream, " 1'b0 ");
-        } break;
-        case (E_COLON):
-            fprintf(output_stream, " : ");
-            break;
-        case (E_PROBE):
-            fprintf(output_stream, "PROBE");
-            fatal_error("%u should have been handled else where", e->type);
-            break;
-        case (E_COMMA):
-            fprintf(output_stream, "COMMA");
-            fatal_error("%u should have been handled else where", e->type);
-            break;
-        case (E_CONCAT):
-            if (!e->u.e.r) {
-                print_expression(output_stream, e->u.e.l, exprmap);
-            } else {
-                Expr *tmp = e;
-                fprintf(output_stream, "{");
-                while (tmp) {
-                    print_expression(output_stream, tmp->u.e.l, exprmap);
-                    if (tmp->u.e.r) {
-                        fprintf(output_stream, " ,");
-                    }
-                    tmp = tmp->u.e.r;
+        } else {
+            const Expr *tmp = e;
+            fprintf(output_stream, "{");
+            while (tmp) {
+                print_expression(output_stream, tmp->u.e.l, exprmap);
+                if (tmp->u.e.r) {
+                    fprintf(output_stream, " ,");
                 }
-                fprintf(output_stream, "}");
+                tmp = tmp->u.e.r;
             }
-            break;
-        case (E_BITFIELD):
-            unsigned int l;
-            unsigned int r;
-            if (e->u.e.r->u.e.l) {
-                l = (unsigned long)e->u.e.r->u.e.r->u.v;
-                r = (unsigned long)e->u.e.r->u.e.l->u.v;
-            } else {
-                l = (unsigned long)e->u.e.r->u.e.r->u.v;
-                r = l;
-            }
+            fprintf(output_stream, "}");
+        }
+        break;
+    case (E_BITFIELD):
+        unsigned int l;
+        unsigned int r;
+        if (e->u.e.r->u.e.l) {
+            l = (unsigned long)e->u.e.r->u.e.r->u.v;
+            r = (unsigned long)e->u.e.r->u.e.l->u.v;
+        } else {
+            l = (unsigned long)e->u.e.r->u.e.r->u.v;
+            r = l;
+        }
 
-            { fprintf(output_stream, "%s", exprmap.at(e)); }
-            fprintf(output_stream, " [");
-            if (l != r) {
-                fprintf(output_stream, "%i:", l);
-                fprintf(output_stream, "%i", r);
-            } else {
-                fprintf(output_stream, "%i", r);
-            }
-            fprintf(output_stream, "]");
-            break;
-        case (E_COMPLEMENT):
-            fprintf(output_stream, " ~");
-            print_expression(output_stream, e->u.e.l, exprmap);
-            break;
-        case (E_REAL): {
-            auto b = exprmap.find(e);
-            if (b != exprmap.end())
-                fprintf(output_stream, "%s", b->second);
-            else
-                fprintf(output_stream, "64'd%lu", e->u.v);
-        } break;
-        case (E_RAWFREE):
-            fprintf(output_stream, "RAWFREE\n");
-            fatal_error("%u should have been handled else where", e->type);
-            break;
-        case (E_END):
-            fprintf(output_stream, "END\n");
-            fatal_error("%u should have been handled else where", e->type);
-            break;
-        case (E_NUMBER):
-            fprintf(output_stream, "NUMBER\n");
-            fatal_error("%u should have been handled else where", e->type);
-            break;
-        case (E_FUNCTION):
-            fprintf(output_stream, "FUNCTION\n");
-            fatal_error("%u should have been handled else where", e->type);
-            break;
-        default:
-            fprintf(output_stream, "Whaaat?! %i\n", e->type);
-            break;
+        { fprintf(output_stream, "%s", exprmap.at(e)); }
+        fprintf(output_stream, " [");
+        if (l != r) {
+            fprintf(output_stream, "%i:", l);
+            fprintf(output_stream, "%i", r);
+        } else {
+            fprintf(output_stream, "%i", r);
+        }
+        fprintf(output_stream, "]");
+        break;
+    case (E_COMPLEMENT):
+        fprintf(output_stream, " ~");
+        print_expression(output_stream, e->u.e.l, exprmap);
+        break;
+    case (E_REAL): {
+        auto b = exprmap.find(e);
+        if (b != exprmap.end())
+            fprintf(output_stream, "%s", b->second);
+        else
+            fprintf(output_stream, "64'd%lu", e->u.v);
+    } break;
+    case (E_RAWFREE):
+        fprintf(output_stream, "RAWFREE\n");
+        fatal_error("%u should have been handled else where", e->type);
+        break;
+    case (E_END):
+        fprintf(output_stream, "END\n");
+        fatal_error("%u should have been handled else where", e->type);
+        break;
+    case (E_NUMBER):
+        fprintf(output_stream, "NUMBER\n");
+        fatal_error("%u should have been handled else where", e->type);
+        break;
+    case (E_FUNCTION):
+        fprintf(output_stream, "FUNCTION\n");
+        fatal_error("%u should have been handled else where", e->type);
+        break;
+    default:
+        fprintf(output_stream, "Whaaat?! %i\n", e->type);
+        break;
     }
     fprintf(output_stream, ")");
 }

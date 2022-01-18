@@ -20,10 +20,10 @@
  *
  **************************************************************************/
 
-#include <unordered_map>
-#include <list>
 #include <act/act.h>
+#include <list>
 #include <string>
+#include <unordered_map>
 
 /// enum for referencing the mapper software type, to define which external synthesis tool to use for synthesis
 enum expr_mapping_software { yosys = 0, synopsis = 1, genus = 2 };
@@ -36,9 +36,9 @@ enum expr_mapping_target {
 
 /// the metadata object holds all extracted points of the expr set.
 class ExprBlockInfo {
-private:
+  private:
     /* data */
-public:
+  public:
     /// the typical delay corner as normal temp, in seconds. 0 if not extracted.
     const double delay_typ;
 
@@ -75,31 +75,31 @@ public:
                   const double e_power_typ, const double e_power_max, const double e_area,
                   const double e_power_typ_static = 0, const double e_power_typ_dynamic = 0,
                   const double e_power_max_static = 0, const double e_power_max_dynamic = 0)
-            : delay_typ(e_delay_typ)
-            , delay_max(e_delay_max)
-            , delay_min(e_delay_min)
-            , power_typ(e_power_typ)
-            , power_typ_static(e_power_typ_static)
-            , power_typ_dynamic(e_power_typ_dynamic)
-            , power_max(e_power_max)
-            , power_max_static(e_power_max_static)
-            , power_max_dynamic(e_power_max_dynamic)
-            , area(e_area) {}
+        : delay_typ(e_delay_typ)
+        , delay_max(e_delay_max)
+        , delay_min(e_delay_min)
+        , power_typ(e_power_typ)
+        , power_typ_static(e_power_typ_static)
+        , power_typ_dynamic(e_power_typ_dynamic)
+        , power_max(e_power_max)
+        , power_max_static(e_power_max_static)
+        , power_max_dynamic(e_power_max_dynamic)
+        , area(e_area) {}
 
     /// Construct a new Expr Block dummy with no extration results =>
     /// all 0, but delay_typ = -1 to indicate that the results were not
     /// created.
     ExprBlockInfo()
-            : delay_typ(-1)
-            , delay_max(0)
-            , delay_min(0)
-            , power_typ(0)
-            , power_typ_static(0)
-            , power_typ_dynamic(0)
-            , power_max(0)
-            , power_max_static(0)
-            , power_max_dynamic(0)
-            , area(0) {}
+        : delay_typ(-1)
+        , delay_max(0)
+        , delay_min(0)
+        , power_typ(0)
+        , power_typ_static(0)
+        , power_typ_dynamic(0)
+        , power_max(0)
+        , power_max_static(0)
+        , power_max_dynamic(0)
+        , area(0) {}
     ~ExprBlockInfo() = default;
 };
 
@@ -109,7 +109,7 @@ public:
  * if you
  */
 class ExternalExprOpt {
-public:
+  public:
     /// INTEGER ID MODE - single expr
     /// run_external_opt will take one expression "e" and syntesise, optimise and map it to a gate library.
     /// the resulting block will be appended to the output file, the block will be named with the block prefix and the
@@ -126,11 +126,12 @@ public:
     /// E_INT is defind it will take precidence over printing the value, E_VAR has to have a mapping.
     /// @param in_width_map the map from pointer (as long int) of the expr struct to int for how many wires the
     /// expression is referencing to, so the width of the specifig input bus.
-    ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, Expr *e, list_t *in_expr_list,
+    ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *e, list_t *in_expr_list,
                                     iHashtable *in_expr_map, iHashtable *in_width_map);
-    ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, Expr *expr, std::list<Expr *> in_expr_list,
-                                    std::unordered_map<Expr *, int> in_expr_map,
-                                    std::unordered_map<Expr *, int> in_width_map);
+    ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *expr,
+                                    const std::list<const Expr *> &in_expr_list,
+                                    const std::unordered_map<const Expr *, int> &in_expr_map,
+                                    const std::unordered_map<const Expr *, int> &in_width_map);
 
     /// INTEGER ID MODE - set of expr - do not use
     /// run_external_opt will take a list of expressions "expr_list" and syntesise, optimise and map it to a gate
@@ -149,9 +150,9 @@ public:
     /// the expression to the corresponding IDs
     ExprBlockInfo *run_external_opt(int expr_set_number, list_t *expr_list, list_t *in_list, list_t *out_list,
                                     iHashtable *exprmap);
-    ExprBlockInfo *run_external_opt(int expr_set_number, std::list<Expr *> /*expr_list*/,
-                                    std::list<std::pair<int, int>> in_list, std::list<std::pair<int, int>> out_list,
-                                    std::unordered_map<Expr *, int> exprmap_int);
+    ExprBlockInfo *run_external_opt(int expr_set_number, const std::list<std::pair<int, int>> &in_list,
+                                    const std::list<std::pair<int, int>> &out_list,
+                                    const std::unordered_map<const Expr *, int> &exprmap_int);
 
     /// C-STRING MODE - set of expr - recomended mode - outputs are unique
     /// run_external_opt will take a set of expressions and syntesise, optimise and map it to a gate library.
@@ -177,12 +178,13 @@ public:
     ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map,
                                     iHashtable *in_width_map, list_t *out_expr_list, iHashtable *out_expr_map,
                                     iHashtable *out_width_map, list_t *hidden_expr_list = nullptr);
-    ExprBlockInfo *run_external_opt(const char *expr_set_name, std::list<Expr *> in_expr_list,
-                                    std::unordered_map<Expr *, const char *> in_expr_map,
-                                    std::unordered_map<Expr *, int> in_width_map, std::list<Expr *> out_expr_list,
-                                    std::unordered_map<Expr *, const char *> out_expr_map,
-                                    std::unordered_map<Expr *, int> out_width_map,
-                                    std::list<Expr *> hidden_expr_list = {});
+    ExprBlockInfo *run_external_opt(const char *expr_set_name, const std::list<const Expr *> &in_expr_list,
+                                    const std::unordered_map<const Expr *, const char *> &in_expr_map,
+                                    const std::unordered_map<const Expr *, int> &in_width_map,
+                                    const std::list<const Expr *> &out_expr_list,
+                                    const std::unordered_map<const Expr *, const char *> &out_expr_map,
+                                    const std::unordered_map<const Expr *, int> &out_width_map,
+                                    const std::list<const Expr *> &hidden_expr_list = {});
 
     /// C-STRING MODE - set of expr - with copy on output for non unique outputs/hidden expressions
     /// run_external_opt will take a set of expressions and syntesise, optimise and map it to a gate library.
@@ -211,13 +213,14 @@ public:
                                     iHashtable *in_width_map, list_t *out_expr_list, list_t *out_expr_name_list,
                                     iHashtable *out_width_map, list_t *hidden_expr_list = nullptr,
                                     list_t *hidden_expr_name_list = nullptr);
-    ExprBlockInfo *run_external_opt(const char *expr_set_name, std::list<Expr *> in_expr_list,
-                                    std::unordered_map<Expr *, const char *> in_expr_map,
-                                    std::unordered_map<Expr *, int> in_width_map, std::list<Expr *> out_expr_list,
-                                    std::list<const char *> out_expr_name_list,
-                                    std::unordered_map<Expr *, int> out_width_map,
-                                    std::list<Expr *> hidden_expr_list = {},
-                                    std::list<const char *> hidden_expr_name_list = {});
+    ExprBlockInfo *run_external_opt(const char *expr_set_name, const std::list<const Expr *> &in_expr_list,
+                                    const std::unordered_map<const Expr *, const char *> &in_expr_map,
+                                    const std::unordered_map<const Expr *, int> &in_width_map,
+                                    const std::list<const Expr *> &out_expr_list,
+                                    const std::list<const char *> &out_expr_name_list,
+                                    const std::unordered_map<const Expr *, int> &out_width_map,
+                                    const std::list<const Expr *> &hidden_expr_list = {},
+                                    const std::list<const char *> &hidden_expr_name_list = {});
 
     /// Construct a new External Exp Opt generator, supply it with all the settings needed.
     /// most of the technology settings are loaded via the configuration file expropt.conf
@@ -230,12 +233,12 @@ public:
     ExternalExprOpt(const expr_mapping_software datapath_syntesis_tool, const expr_mapping_target mapping_target,
                     const bool tie_cells, std::string expr_file_path = "", std::string exprid_prefix = "e",
                     std::string block_prefix = "blk")
-            : expr_output_file(std::move(expr_file_path))
-            , expr_prefix(std::move(exprid_prefix))
-            , module_prefix(std::move(block_prefix))
-            , mapper(datapath_syntesis_tool)
-            , use_tie_cells(tie_cells)
-            , wire_encoding(mapping_target) {
+        : expr_output_file(std::move(expr_file_path))
+        , expr_prefix(std::move(exprid_prefix))
+        , module_prefix(std::move(block_prefix))
+        , mapper(datapath_syntesis_tool)
+        , use_tie_cells(tie_cells)
+        , wire_encoding(mapping_target) {
 
         config_set_default_int("expropt.clean_tmp_files", 1);
         config_set_default_int("expropt.verbose", 1);
@@ -273,7 +276,7 @@ public:
     /// @return ExprBlockInfo* the datastructure with the result data
     ExprBlockInfo *parse_genus_log(const std::string &log_file_name);
 
-private:
+  private:
     bool cleanup;
     /// print the verilog module, internal takes the inputs and outputs as lists of expressions (plus the properites
     /// name and width as maps). In and out have to be seperate, because in the in case you mean the expression var
@@ -295,11 +298,13 @@ private:
     /// for the outputs again when using the same char* string name.
     /// @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of
     /// the expression is assinged to.
-    void print_expr_verilog(FILE *output_stream, const char *expr_set_name, std::list<Expr *> in_list,
-                            std::unordered_map<Expr *, const char *> inexprmap,
-                            std::unordered_map<Expr *, int> inwidthmap, std::list<Expr *> out_list,
-                            std::list<const char *> out_expr_name_list, std::unordered_map<Expr *, int> outwidthmap,
-                            std::list<Expr *> expr_list, std::list<const char *> hidden_expr_name_list);
+    void print_expr_verilog(FILE *output_stream, const char *expr_set_name, const std::list<const Expr *> &in_list,
+                            const std::unordered_map<const Expr *, const char *> &inexprmap,
+                            const std::unordered_map<const Expr *, int> &inwidthmap,
+                            const std::list<const Expr *> &out_list, const std::list<const char *> &out_expr_name_list,
+                            const std::unordered_map<const Expr *, int> &outwidthmap,
+                            const std::list<const Expr *> &expr_list,
+                            const std::list<const char *> &hidden_expr_name_list);
 
     /// the generator for the genus run scripts.
     /// @param tcl_file_name the file the genus instructions are written to
@@ -314,7 +319,8 @@ private:
     /// @param e the expression to be printed to
     /// @param exprmap the in_expr_map containing the leaf mappings, E_VAR mappings are required,
     /// other leaf mappings are optional, but take precidence over printing the hard coded value.
-    void print_expression(FILE *output_stream, Expr *e, std::unordered_map<Expr *, const char *> exprmap);
+    void print_expression(FILE *output_stream, const Expr *e,
+                          const std::unordered_map<const Expr *, const char *> &name_from_leaf);
 
     double parse_and_return_max(std::string filename, std::string parse_format, double failure_value = 0,
                                 bool fail_if_file_does_no_exist = false);
