@@ -63,4 +63,4 @@ set_target_properties(ExprOptLibSh PROPERTIES OUTPUT_NAME "expropt_sh")
 
 install(FILES expropt.conf DESTINATION $ENV{ACT_HOME}/conf/generic/)
 install(FILES expropt.h DESTINATION $ENV{ACT_HOME}/include/act/)
-install(TARGETS ExprOptLib ExprOptLibSh DESTINATION $ENV{ACT_HOME}/bin/)
+install(TARGETS ExprOptLib ExprOptLibSh DESTINATION $ENV{ACT_HOME}/lib/)
