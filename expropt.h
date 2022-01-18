@@ -27,17 +27,16 @@
 
 /// enum for referencing the mapper software type, to define which external synthesis tool to use for synthesis
 enum expr_mapping_software { yosys = 0, synopsis = 1, genus = 2 };
+enum class ExprMappingSoftware { yosys, synopsis, genus };
 
 /// enum for referencing the pass type
-enum expr_mapping_target {
-    qdi = 0,
-    bd = 1,
-};
+enum expr_mapping_target { qdi = 0, bd = 1 };
+enum class ExprMappingTarget { qdi, bd };
+
+enum class ShouldTieCells { no, yes };
 
 /// the metadata object holds all extracted points of the expr set.
 class ExprBlockInfo {
-  private:
-    /* data */
   public:
     /// the typical delay corner as normal temp, in seconds. 0 if not extracted.
     const double delay_typ;
@@ -220,7 +219,7 @@ class ExternalExprOpt {
                      list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr);
 
     [[maybe_unused]] ExprBlockInfo *run_external_opt(const std::string &expr_set_name,
-                                                     const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
+                                                     const std::vector<ExprPtrWithNameAndWidth> &leafs,
                                                      const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                                                      const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs);
 
@@ -232,45 +231,22 @@ class ExternalExprOpt {
     /// to. if empty only metadata will be extracted.
     /// @param exprid_prefix optional - the prefix for all in and outputs  - if integer id mode is used
     /// @param block_prefix the prefix for the expression block - if integer id mode is used
-    ExternalExprOpt(const expr_mapping_software datapath_syntesis_tool, const expr_mapping_target mapping_target,
-                    const bool tie_cells, std::string expr_file_path = "", std::string exprid_prefix = "e",
-                    std::string block_prefix = "blk")
-        : expr_output_file(std::move(expr_file_path))
-        , expr_prefix(std::move(exprid_prefix))
-        , module_prefix(std::move(block_prefix))
-        , mapper(datapath_syntesis_tool)
-        , use_tie_cells(tie_cells)
-        , wire_encoding(mapping_target) {
+    [[deprecated]] ExternalExprOpt(expr_mapping_software datapath_synthesis_tool, expr_mapping_target mapping_target,
+                                   bool tie_cells, std::string expr_file_path = "", std::string exprid_prefix = "e",
+                                   std::string block_prefix = "blk")
+        : ExternalExprOpt(
+              (datapath_synthesis_tool == expr_mapping_software::genus
+                   ? ExprMappingSoftware::genus
+                   : (datapath_synthesis_tool == expr_mapping_software::synopsis ? ExprMappingSoftware::synopsis
+                                                                                 : ExprMappingSoftware::yosys)),
+              (mapping_target == expr_mapping_target::bd ? ExprMappingTarget::bd : ExprMappingTarget::qdi),
+              tie_cells ? ShouldTieCells::yes : ShouldTieCells::no, std::move(expr_file_path), std::move(exprid_prefix),
+              std::move(block_prefix)) {}
 
-        config_set_default_int("expropt.clean_tmp_files", 1);
-        config_set_default_int("expropt.verbose", 1);
-        config_set_default_string("expropt.act_cell_lib_qdi_namespace", "syn");
-        config_set_default_string("expropt.act_cell_lib_qdi_wire_type", "sdtexprchan<1>");
-        config_set_default_string("expropt.act_cell_lib_bd_namespace", "syn");
-        config_set_default_string("expropt.act_cell_lib_bd_wire_type", "bool");
-
-        config_set_default_string("expropt.captable", "none");
-        config_set_default_string("expropt.lef", "none");
-        config_set_default_string("expropt.liberty_ff_hightemp", "none");
-        config_set_default_string("expropt.liberty_ff_lowtemp", "none");
-        config_set_default_string("expropt.liberty_ss_hightemp", "none");
-
-        config_set_default_real("expropt.default_load", 1.0);
-
-        config_read("expropt.conf");
-
-        if (wire_encoding == qdi) {
-            cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
-            cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
-            expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
-        } else {
-            cell_act_file = config_get_string("expropt.act_cell_lib_bd");
-            cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
-            expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
-        }
-        cleanup = config_get_int("expropt.clean_tmp_files");
-    }
-    ~ExternalExprOpt();
+    ExternalExprOpt(ExprMappingSoftware datapath_syntesis_tool, ExprMappingTarget mapping_target,
+                    ShouldTieCells tie_cells, std::string expr_file_path = "", std::string exprid_prefix = "e",
+                    std::string block_prefix = "blk");
+    ~ExternalExprOpt() = default;
 
     /// work in progress value extraction from genus logs, area is also possible in abc, @todo abc timing is not known
     /// if printable.
@@ -345,11 +321,11 @@ class ExternalExprOpt {
     const std::string module_prefix;
 
     /// the software to be used for syntesis and mapping.
-    const expr_mapping_software mapper;
+    const ExprMappingSoftware mapper;
 
     /// should tie cells be incerted by the syntesis software (true), or should v2act take cae of it (false)
-    const bool use_tie_cells;
+    const ShouldTieCells use_tie_cells;
 
     /// is it a bundeld data or dualrail pass?
-    const expr_mapping_target wire_encoding;
+    const ExprMappingTarget wire_encoding;
 };

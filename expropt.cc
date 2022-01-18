@@ -78,6 +78,7 @@ template <typename T, typename T1, typename T2, typename T3>
 std::vector<T> zip_vmm(const std::vector<T1> &v1, const std::unordered_map<T1, T2> &v2,
                        const std::unordered_map<T1, T3> &v3) {
     std::vector<T> u;
+    u.reserve(v1.size());
     for (const auto &x : v1)
         u.push_back(T{x, v2.at(x), v3.at(x)});
     return u;
@@ -85,6 +86,7 @@ std::vector<T> zip_vmm(const std::vector<T1> &v1, const std::unordered_map<T1, T
 template <typename T, typename T1, typename T2, typename T3>
 std::vector<T> zip_vvm(const std::vector<T1> &v1, const std::vector<T2> &v2, const std::unordered_map<T1, T3> &v3) {
     std::vector<T> u;
+    u.reserve(v1.size());
     assert(v1.size() == v2.size());
     for (ssize_t i = 0; i != (ssize_t)v1.size(); ++i)
         u.push_back(T{v1[i], v2[i], v3.at(v1[i])});
@@ -99,6 +101,7 @@ std::unordered_map<K, T> map_val_remap(const std::unordered_map<K, V> &m) {
 }
 template <typename T, typename V> std::vector<T> vec_val_remap(const std::vector<V> &v) {
     std::vector<T> u;
+    u.reserve(v.size());
     for (const auto &x : v)
         u.push_back(T{x});
     return u;
@@ -118,12 +121,47 @@ template <typename... Args> [[nodiscard]] std::string string_format(const std::s
 
 } // namespace
 
-/**
- * Destroy the External Expr Opt:: External Expr Opt object
- *
- * no memory allocation on global vars, nothing to be done
- */
-ExternalExprOpt::~ExternalExprOpt() = default;
+ExternalExprOpt::ExternalExprOpt(ExprMappingSoftware datapath_syntesis_tool, ExprMappingTarget mapping_target,
+                                 ShouldTieCells tie_cells, std::string expr_file_path, std::string exprid_prefix,
+                                 std::string block_prefix)
+    : expr_output_file(std::move(expr_file_path))
+    , expr_prefix(std::move(exprid_prefix))
+    , module_prefix(std::move(block_prefix))
+    , mapper(datapath_syntesis_tool)
+    , use_tie_cells(tie_cells)
+    , wire_encoding(mapping_target) {
+
+    config_set_default_int("expropt.clean_tmp_files", 1);
+    config_set_default_int("expropt.verbose", 1);
+    config_set_default_string("expropt.act_cell_lib_qdi_namespace", "syn");
+    config_set_default_string("expropt.act_cell_lib_qdi_wire_type", "sdtexprchan<1>");
+    config_set_default_string("expropt.act_cell_lib_bd_namespace", "syn");
+    config_set_default_string("expropt.act_cell_lib_bd_wire_type", "bool");
+
+    config_set_default_string("expropt.captable", "none");
+    config_set_default_string("expropt.lef", "none");
+    config_set_default_string("expropt.liberty_ff_hightemp", "none");
+    config_set_default_string("expropt.liberty_ff_lowtemp", "none");
+    config_set_default_string("expropt.liberty_ss_hightemp", "none");
+
+    config_set_default_real("expropt.default_load", 1.0);
+
+    config_read("expropt.conf");
+
+    switch (wire_encoding) {
+    case ExprMappingTarget::qdi:
+        cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
+        cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
+        expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
+        break;
+    case ExprMappingTarget::bd:
+        cell_act_file = config_get_string("expropt.act_cell_lib_bd");
+        cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
+        expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
+        break;
+    }
+    cleanup = config_get_int("expropt.clean_tmp_files");
+}
 
 // the a wrapper for chp2prs to just run the optimisation with a single expression
 [[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth,
@@ -154,7 +192,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int target
  * the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to
  * ExprOpt standart
  */
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/, list_t *in_list,
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/, list_t *in_list,
                                                  list_t *out_list, iHashtable *exprmap_int) {
     return run_external_opt(expr_set_number, to_ipair_vector(in_list), to_ipair_vector(out_list),
                             to_imap<const Expr *, int>(exprmap_int));
@@ -212,7 +250,6 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
         zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_out_exprs), out_name_map, out_width_map);
     auto hidden_exprs =
         zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_hidden_exprs), out_name_map, out_width_map);
-    ;
 
     return run_external_opt(expr_set_name, in_exprs, out_exprs, hidden_exprs);
 }
@@ -375,23 +412,22 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
 #endif
 
     switch (mapper) {
-    case genus:
+    case ExprMappingSoftware::genus:
 #ifdef FOUND_exproptcommercial
         if (expr_output_file.empty())
             exec_failure = helper->run_genus(verilog_file, mapped_file, expr_set_name, true);
         else
             exec_failure = helper->run_genus(verilog_file, mapped_file, expr_set_name);
-        break;
 #else
         fatal_error("cadence genus support was not enabled on compile time");
-        break;
 #endif
+        break;
 
-    case synopsis:
+    case ExprMappingSoftware::synopsis:
         // would need a sample script to implement this
         fatal_error("synopsis compiler is not implemented yet");
         break;
-    case yosys: {
+    case ExprMappingSoftware::yosys: {
         /* create a .sdc file to get delay values */
         verilog_stream = fopen(sdc_file.data(), "w");
         if (!verilog_stream) {
@@ -399,9 +435,6 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
         }
         fprintf(verilog_stream, "set_load %g\n", config_get_real("expropt.default_load"));
         fclose(verilog_stream);
-    }
-        // FALLTHROUGH
-    default:
         // yosys gets its script passed via stdin (very short)
         char *configreturn = config_get_string("expropt.liberty_tt_typtemp");
         if (std::strcmp(configreturn, "none") != 0) {
@@ -411,7 +444,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
                     constr = 1;
                 }
             }
-            if (use_tie_cells) {
+            if (use_tie_cells == ShouldTieCells::yes) {
                 if (constr) {
                     sprintf(
                         cmd,
@@ -455,6 +488,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
         // @TODO do metadata extraction via ABC
         break;
     }
+    }
 
     // read the resulting netlist and map it back to act, if the wire_type is not bool use the async mode the specify a
     // wire type as a channel. skip if run was just for extraction of properties => output filename empty
@@ -477,7 +511,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
     }
     // parce block info - WORK IN PROGRESS
     switch (mapper) {
-    case genus: {
+    case ExprMappingSoftware::genus: {
 #ifdef FOUND_exproptcommercial
         std::string genus_log = mapped_file.data();
         info = new ExprBlockInfo(helper->parse_genus_log(genus_log, metadata_delay_typ),
@@ -494,11 +528,10 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
         fatal_error("cadence genus support was not enabled on compile time");
 #endif
     } break;
-    case synopsis:
+    case ExprMappingSoftware::synopsis:
         fatal_error("synopsis compiler are not implemented yet");
         break;
-    case yosys:
-    default: {
+    case ExprMappingSoftware::yosys: {
         double delay, area;
         area = 0.0;
         delay = parse_abc_info(mapped_file.data(), &area);
@@ -509,13 +542,12 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
     // clean up temporary files
     if (cleanup) {
         switch (mapper) {
-        case genus:
+        case ExprMappingSoftware::genus:
             sprintf(cmd, "rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm genus.*",
                     mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data());
             break;
-        case synopsis:
-        case yosys:
-        default:
+        case ExprMappingSoftware::synopsis:
+        case ExprMappingSoftware::yosys:
             sprintf(cmd, "rm %s && rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(),
                     sdc_file.data(), mapped_file.data());
             break;
@@ -1175,7 +1207,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, const Expr *e,
     fprintf(tcl_file, "syn_map\n");
 
     // tiecells insert yes / no
-    if (use_tie_cells) {
+    if (use_tie_cells == ShouldTieCells::yes) {
         // the option is to either use one tiehi+tielo cell for all => unique,
         fprintf(tcl_file, "set_db use_tiehilo_for_const unique\n");
         // or one tie for every input => duplicate, or no => none
