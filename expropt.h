@@ -21,9 +21,9 @@
  **************************************************************************/
 
 #include <act/act.h>
-#include <list>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 /// enum for referencing the mapper software type, to define which external synthesis tool to use for synthesis
 enum expr_mapping_software { yosys = 0, synopsis = 1, genus = 2 };
@@ -110,6 +110,17 @@ class ExprBlockInfo {
  */
 class ExternalExprOpt {
   public:
+    struct ExprPtrWithNameAndWidth {
+        const Expr *e;
+        std::string name;
+        int width;
+    };
+    struct ExprPtrWithIdAndWidth {
+        const Expr *e;
+        int id;
+        int width;
+    };
+
     /// INTEGER ID MODE - single expr
     /// run_external_opt will take one expression "e" and syntesise, optimise and map it to a gate library.
     /// the resulting block will be appended to the output file, the block will be named with the block prefix and the
@@ -126,12 +137,11 @@ class ExternalExprOpt {
     /// E_INT is defind it will take precidence over printing the value, E_VAR has to have a mapping.
     /// @param in_width_map the map from pointer (as long int) of the expr struct to int for how many wires the
     /// expression is referencing to, so the width of the specifig input bus.
-    ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *e, list_t *in_expr_list,
-                                    iHashtable *in_expr_map, iHashtable *in_width_map);
-    ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *expr,
-                                    const std::list<const Expr *> &in_expr_list,
-                                    const std::unordered_map<const Expr *, int> &in_expr_map,
-                                    const std::unordered_map<const Expr *, int> &in_width_map);
+    [[maybe_unused]] [[deprecated("use the new interface")]] ExprBlockInfo *
+    run_external_opt(int expr_set_number, int targetwidth, const Expr *e, list_t *in_expr_list, iHashtable *in_expr_map,
+                     iHashtable *in_width_map);
+    [[maybe_unused]] ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *expr,
+                                                     const std::vector<ExprPtrWithIdAndWidth> &leafs);
 
     /// INTEGER ID MODE - set of expr - do not use
     /// run_external_opt will take a list of expressions "expr_list" and syntesise, optimise and map it to a gate
@@ -148,11 +158,12 @@ class ExternalExprOpt {
     /// order must be alinged with the expression list.
     /// @param exprmap the pointer of the expresion is the key the id is the value, this is to map the variables inside
     /// the expression to the corresponding IDs
-    ExprBlockInfo *run_external_opt(int expr_set_number, list_t *expr_list, list_t *in_list, list_t *out_list,
-                                    iHashtable *exprmap);
-    ExprBlockInfo *run_external_opt(int expr_set_number, const std::list<std::pair<int, int>> &in_list,
-                                    const std::list<std::pair<int, int>> &out_list,
-                                    const std::unordered_map<const Expr *, int> &exprmap_int);
+    [[maybe_unused]] [[deprecated("use the new interface")]] ExprBlockInfo *
+    run_external_opt(int expr_set_number, list_t *expr_list, list_t *in_list, list_t *out_list, iHashtable *exprmap);
+    [[maybe_unused]] ExprBlockInfo *run_external_opt(int expr_set_number,
+                                                     const std::vector<std::pair<int, int>> &in_list,
+                                                     const std::vector<std::pair<int, int>> &out_list,
+                                                     const std::unordered_map<const Expr *, int> &exprmap_int);
 
     /// C-STRING MODE - set of expr - recomended mode - outputs are unique
     /// run_external_opt will take a set of expressions and syntesise, optimise and map it to a gate library.
@@ -175,16 +186,10 @@ class ExternalExprOpt {
     /// output
     /// @param hidden_expr_list optional - like out_list just the assigns are not used on the outputs, they can be used
     /// leafs for the outputs again when using the same char* string name.
-    ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map,
-                                    iHashtable *in_width_map, list_t *out_expr_list, iHashtable *out_expr_map,
-                                    iHashtable *out_width_map, list_t *hidden_expr_list = nullptr);
-    ExprBlockInfo *run_external_opt(const char *expr_set_name, const std::list<const Expr *> &in_expr_list,
-                                    const std::unordered_map<const Expr *, const char *> &in_expr_map,
-                                    const std::unordered_map<const Expr *, int> &in_width_map,
-                                    const std::list<const Expr *> &out_expr_list,
-                                    const std::unordered_map<const Expr *, const char *> &out_expr_map,
-                                    const std::unordered_map<const Expr *, int> &out_width_map,
-                                    const std::list<const Expr *> &hidden_expr_list = {});
+    [[maybe_unused]] [[deprecated("use the new interface")]] ExprBlockInfo *
+    run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map,
+                     list_t *out_expr_list, iHashtable *out_expr_map, iHashtable *out_width_map,
+                     list_t *hidden_expr_list = nullptr);
 
     /// C-STRING MODE - set of expr - with copy on output for non unique outputs/hidden expressions
     /// run_external_opt will take a set of expressions and syntesise, optimise and map it to a gate library.
@@ -209,18 +214,15 @@ class ExternalExprOpt {
     /// leafs for the outputs again when using the same char* string name.
     /// @param hidden_expr_name_list an index aligned list (with regards to hidden_expr_list) with the name (C string
     /// pointer) the result of the expression is assinged to
-    ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map,
-                                    iHashtable *in_width_map, list_t *out_expr_list, list_t *out_expr_name_list,
-                                    iHashtable *out_width_map, list_t *hidden_expr_list = nullptr,
-                                    list_t *hidden_expr_name_list = nullptr);
-    ExprBlockInfo *run_external_opt(const char *expr_set_name, const std::list<const Expr *> &in_expr_list,
-                                    const std::unordered_map<const Expr *, const char *> &in_expr_map,
-                                    const std::unordered_map<const Expr *, int> &in_width_map,
-                                    const std::list<const Expr *> &out_expr_list,
-                                    const std::list<const char *> &out_expr_name_list,
-                                    const std::unordered_map<const Expr *, int> &out_width_map,
-                                    const std::list<const Expr *> &hidden_expr_list = {},
-                                    const std::list<const char *> &hidden_expr_name_list = {});
+    [[maybe_unused]] [[deprecated("use the new interface")]] ExprBlockInfo *
+    run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map,
+                     list_t *out_expr_list, list_t *out_expr_name_list, iHashtable *out_width_map,
+                     list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr);
+
+    [[maybe_unused]] ExprBlockInfo *run_external_opt(const char *expr_set_name,
+                                                     const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
+                                                     const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
+                                                     const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs);
 
     /// Construct a new External Exp Opt generator, supply it with all the settings needed.
     /// most of the technology settings are loaded via the configuration file expropt.conf
@@ -298,13 +300,10 @@ class ExternalExprOpt {
     /// for the outputs again when using the same char* string name.
     /// @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of
     /// the expression is assinged to.
-    void print_expr_verilog(FILE *output_stream, const char *expr_set_name, const std::list<const Expr *> &in_list,
-                            const std::unordered_map<const Expr *, const char *> &inexprmap,
-                            const std::unordered_map<const Expr *, int> &inwidthmap,
-                            const std::list<const Expr *> &out_list, const std::list<const char *> &out_expr_name_list,
-                            const std::unordered_map<const Expr *, int> &outwidthmap,
-                            const std::list<const Expr *> &expr_list,
-                            const std::list<const char *> &hidden_expr_name_list);
+    void print_expr_verilog(FILE *output_stream, const char *expr_set_name,
+                            const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
+                            const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
+                            const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs);
 
     /// the generator for the genus run scripts.
     /// @param tcl_file_name the file the genus instructions are written to
