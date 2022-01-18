@@ -24,6 +24,7 @@
 #include <cstring>
 #include <fstream>
 #include <list>
+#include <memory>
 #include <vector>
 
 #ifdef FOUND_exproptcommercial
@@ -103,6 +104,18 @@ template <typename T, typename V> std::vector<T> vec_val_remap(const std::vector
     return u;
 }
 
+// https://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf
+template <typename... Args> [[nodiscard]] std::string string_format(const std::string &format, Args... args) {
+    int size_s = std::snprintf(nullptr, 0, format.c_str(), args...) + 1; // Extra space for '\0'
+    if (size_s <= 0) {
+        throw std::runtime_error("Error during formatting.");
+    }
+    auto size = static_cast<size_t>(size_s);
+    auto buf = std::make_unique<char[]>(size);
+    std::snprintf(buf.get(), size, format.c_str(), args...);
+    return {buf.get(), buf.get() + size - 1}; // We don't want the '\0' inside
+}
+
 } // namespace
 
 /**
@@ -113,9 +126,9 @@ template <typename T, typename V> std::vector<T> vec_val_remap(const std::vector
 ExternalExprOpt::~ExternalExprOpt() = default;
 
 // the a wrapper for chp2prs to just run the optimisation with a single expression
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth, const Expr *expr,
-                                                 list_t *in_expr_list, iHashtable *in_expr_map,
-                                                 iHashtable *in_width_map) {
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int targetwidth,
+                                                                  const Expr *expr, list_t *in_expr_list,
+                                                                  iHashtable *in_expr_map, iHashtable *in_width_map) {
     auto leafs =
         zip_vmm<ExprPtrWithIdAndWidth>(to_vector<const Expr *>(in_expr_list), to_imap<const Expr *, int>(in_expr_map),
                                        to_imap<const Expr *, int>(in_width_map));
@@ -126,17 +139,13 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int target
     // build the data structures need
     std::vector<ExprPtrWithNameAndWidth> leaf_exprs, out_exprs;
     for (const auto &[e, id, width] : leafs) {
-        // TODO us std::format and Algo::map
-        char charbuf[1024 + 1];
-        sprintf(charbuf, "%s%u", expr_prefix.data(), id);
-        leaf_exprs.push_back({e, std::string{charbuf}, width});
+        leaf_exprs.push_back({e, string_format("%s%u", expr_prefix.data(), id), width});
     }
 
     out_exprs = {{expr, "out", targetwidth}};
 
     // generate module name
-    char expr_set_name[1024];
-    sprintf(expr_set_name, "%s%u", module_prefix.data(), expr_set_number);
+    std::string expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
 
     return run_external_opt(expr_set_name, leaf_exprs, out_exprs, {});
 }
@@ -167,21 +176,16 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
     for (const auto &[li, li_width] : in_list) {
         const Expr *e = exprmap_int_inv.at(li);
         assert(e);
-        char *charbuf = (char *)malloc(sizeof(char) * (1024 + 1));
-        sprintf(charbuf, "%s%u", expr_prefix.data(), li);
-        leaf_exprs.push_back({e, std::string{charbuf}, li_width});
+        leaf_exprs.push_back({e, string_format("%s%u", expr_prefix.data(), li), li_width});
     }
     // do the exact same for the outlist!
     for (const auto &[li, li_width] : out_list) {
         const Expr *e = exprmap_int_inv.at(li);
         assert(e);
-        char *charbuf = (char *)malloc(sizeof(char) * (1024 + 1));
-        sprintf(charbuf, "%s%u", expr_prefix.data(), li);
-        out_exprs.push_back({e, std::string{charbuf}, li_width});
+        out_exprs.push_back({e, string_format("%s%u", expr_prefix.data(), li), li_width});
     }
     // generate module name
-    char expr_set_name[1024];
-    sprintf(expr_set_name, "%s%u", module_prefix.data(), expr_set_number);
+    auto expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
 
     return run_external_opt(expr_set_name, leaf_exprs, out_exprs, {});
 }
@@ -192,10 +196,10 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
  *
  * the printing of the verilog is seperate
  */
-ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
-                                                 iHashtable *c_in_name_map, iHashtable *c_in_width_map,
-                                                 list_t *c_out_exprs, iHashtable *c_out_name_map,
-                                                 iHashtable *c_out_width_map, list_t *c_hidden_exprs) {
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
+                                                                  iHashtable *c_in_name_map, iHashtable *c_in_width_map,
+                                                                  list_t *c_out_exprs, iHashtable *c_out_name_map,
+                                                                  iHashtable *c_out_width_map, list_t *c_hidden_exprs) {
     // widths and names for the hidden expressions are in the c_out_width_map map
     auto in_exprs =
         zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_in_exprs),
@@ -307,10 +311,11 @@ double parse_abc_info(const char *file, double *area) {
  * the printing of the verilog is seperate
  */
 
-ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
-                                                 iHashtable *c_in_name_map, iHashtable *c_in_width_map,
-                                                 list_t *c_out_exprs, list_t *c_out_names, iHashtable *c_out_width_map,
-                                                 list_t *c_hidden_exprs, list_t *c_hidden_expr_names) {
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
+                                                                  iHashtable *c_in_name_map, iHashtable *c_in_width_map,
+                                                                  list_t *c_out_exprs, list_t *c_out_names,
+                                                                  iHashtable *c_out_width_map, list_t *c_hidden_exprs,
+                                                                  list_t *c_hidden_expr_names) {
 
     // widths for the hidden expressions are in the c_out_width_map map
     auto in_exprs =
@@ -328,7 +333,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list
 
     return run_external_opt(expr_set_name, in_exprs, out_exprs, hidden_exprs);
 }
-ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name,
+ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_name,
                                                  const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
                                                  const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                                                  const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) {
@@ -412,26 +417,28 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name,
                         cmd,
                         "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell "
                         "TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-                        verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(),
+                        verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn, mapped_file.data(),
                         mapped_file.data());
                 } else {
                     sprintf(cmd,
                             "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; hilomap -hicell TIEHIX1 Y "
                             "-locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-                            verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+                            verilog_file.data(), expr_set_name.c_str(), configreturn, mapped_file.data(),
+                            mapped_file.data());
                 }
             } else {
                 if (constr) {
                     sprintf(cmd,
                             "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; write_verilog  "
                             "-nohex -nodec %s;\" | yosys > %s.log",
-                            verilog_file.data(), expr_set_name, sdc_file.data(), configreturn, mapped_file.data(),
-                            mapped_file.data());
+                            verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn,
+                            mapped_file.data(), mapped_file.data());
                 } else {
                     sprintf(cmd,
                             "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex "
                             "-nodec %s;\" | yosys > %s.log",
-                            verilog_file.data(), expr_set_name, configreturn, mapped_file.data(), mapped_file.data());
+                            verilog_file.data(), expr_set_name.c_str(), configreturn, mapped_file.data(),
+                            mapped_file.data());
                 }
             }
         } else
@@ -558,10 +565,10 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name,
 /*
  * print the verilog module with header, in and outputs. call the expression print method for the assigns rhs.
  */
-void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_set_name,
+void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
                                          const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
                                          const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
-                                         const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) {
+                                         const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const {
     if (!output_stream)
         fatal_error("ExternalExprOpt::print_expr_verilog: verilog file is not writable");
 
@@ -573,8 +580,8 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
     }
 
     // Then output the verilog, starting with the module header
-    fprintf(output_stream, "// generated expression module for %s\n\n\n", expr_set_name);
-    fprintf(output_stream, "module %s (", expr_set_name);
+    fprintf(output_stream, "// generated expression module for %s\n\n\n", expr_set_name.c_str());
+    fprintf(output_stream, "module %s (", expr_set_name.c_str());
 
     // now the ports for the header - first inputs
     bool first = true;
@@ -732,9 +739,9 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
     // the actual logic statements
     {
         fprintf(output_stream, "\n\t// the actuall logic statements as assigns\n");
-        for (auto li = out_exprs.begin(); li != out_exprs.end(); ++li) {
-            const Expr *e = li->e;
-            std::string current = li->name;
+        for (const auto &out_expr : out_exprs) {
+            const Expr *e = out_expr.e;
+            std::string current = out_expr.name;
             fprintf(output_stream, "\tassign %s = ", current.data());
             print_expression(output_stream, e, name_from_leaf);
             fprintf(output_stream, ";\n");
@@ -755,7 +762,7 @@ void ExternalExprOpt::print_expr_verilog(FILE *output_stream, const char *expr_s
  * for dualrail. if a mapping exsists for these leaf types the mapping will be prefered over printing the value.
  */
 void ExternalExprOpt::print_expression(FILE *output_stream, const Expr *e,
-                                       const std::unordered_map<const Expr *, const char *> &exprmap) {
+                                       const std::unordered_map<const Expr *, const char *> &exprmap) const {
     fprintf(output_stream, "(");
     switch (e->type) {
     case E_BUILTIN_BOOL:
@@ -999,8 +1006,8 @@ void ExternalExprOpt::print_expression(FILE *output_stream, const Expr *e,
 /**
  * generate the genus tlc script. should be a seperate file and regulated by a compile flag.
  */
-void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *file_name, const char *out_file_name,
-                                         const char *process_name) const {
+[[maybe_unused]] void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *file_name,
+                                                          const char *out_file_name, const char *process_name) const {
     // open the tcl file for writing
     FILE *tcl_file;
     if (tcl_file_name) {

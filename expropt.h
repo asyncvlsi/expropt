@@ -219,7 +219,7 @@ class ExternalExprOpt {
                      list_t *out_expr_list, list_t *out_expr_name_list, iHashtable *out_width_map,
                      list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr);
 
-    [[maybe_unused]] ExprBlockInfo *run_external_opt(const char *expr_set_name,
+    [[maybe_unused]] ExprBlockInfo *run_external_opt(const std::string &expr_set_name,
                                                      const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
                                                      const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                                                      const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs);
@@ -276,7 +276,7 @@ class ExternalExprOpt {
     /// if printable.
     /// @param log_file_name the log file, acutally the base name the individual reports are speperate for each case
     /// @return ExprBlockInfo* the datastructure with the result data
-    ExprBlockInfo *parse_genus_log(const std::string &log_file_name);
+    static ExprBlockInfo *parse_genus_log(const std::string &log_file_name);
 
   private:
     bool cleanup;
@@ -300,10 +300,10 @@ class ExternalExprOpt {
     /// for the outputs again when using the same char* string name.
     /// @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of
     /// the expression is assinged to.
-    void print_expr_verilog(FILE *output_stream, const char *expr_set_name,
+    void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
                             const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
                             const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
-                            const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs);
+                            const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const;
 
     /// the generator for the genus run scripts.
     /// @param tcl_file_name the file the genus instructions are written to
@@ -319,10 +319,10 @@ class ExternalExprOpt {
     /// @param exprmap the in_expr_map containing the leaf mappings, E_VAR mappings are required,
     /// other leaf mappings are optional, but take precidence over printing the hard coded value.
     void print_expression(FILE *output_stream, const Expr *e,
-                          const std::unordered_map<const Expr *, const char *> &name_from_leaf);
+                          const std::unordered_map<const Expr *, const char *> &name_from_leaf) const;
 
-    double parse_and_return_max(std::string filename, std::string parse_format, double failure_value = 0,
-                                bool fail_if_file_does_no_exist = false);
+    static double parse_and_return_max(std::string filename, std::string parse_format, double failure_value = 0,
+                                       bool fail_if_file_does_no_exist = false);
 
     /// the output file name where all act results are appended too.
     const std::string expr_output_file;

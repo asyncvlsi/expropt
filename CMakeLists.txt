@@ -58,8 +58,8 @@ else()
   target_link_libraries(ExprOptLibSh ActLangSh ActCommonSh)
 endif()
 
-set_target_properties(ExprOptLib PROPERTIES OUTPUT_NAME "libexpropt")
-set_target_properties(ExprOptLibSh PROPERTIES OUTPUT_NAME "libexpropt_sh")
+set_target_properties(ExprOptLib PROPERTIES OUTPUT_NAME "expropt")
+set_target_properties(ExprOptLibSh PROPERTIES OUTPUT_NAME "expropt_sh")
 
 install(FILES expropt.conf DESTINATION $ENV{ACT_HOME}/conf/generic/)
 install(FILES expropt.h DESTINATION $ENV{ACT_HOME}/include/act/)
