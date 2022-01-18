@@ -112,6 +112,10 @@ struct ExprPtrWithIdAndWidth {
     int id;
     int width;
 };
+struct NameWithWidth {
+    std::string name;
+    int width;
+};
 
 /**
  * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
@@ -161,11 +165,13 @@ class ExternalExprOpt {
                      list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr) const;
 
     /// This will generate a series of gates to compute the expressions in `out_exprs.` It will do this using the inputs
-    /// in `leafs`, and by computing the intermediate values in `hidden_exprs`. It will copy out_exprs and hidden_exprs
-    /// with repeated names The name of the block of generated gates will be `expr_set_name.` The names in `leafs`,
+    /// in `input_exprs`, and by computing the intermediate values in `hidden_exprs`. It will copy out_exprs and hidden_exprs
+    /// with repeated names. `leaf_map` maps leaf holds both "input variable" leafs and "hidden variable" leafs. The name of the block of generated gates will be `expr_set_name.` The names in `leafs`,
     /// `out_exprs` and `hidden_exprs` must be mutually disjoint.
     [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(const std::string &expr_set_name, const std::vector<ExprPtrWithNameAndWidth> &leafs,
+    run_external_opt(const std::string &expr_set_name,
+                     const std::vector<const Expr *> &input_exprs,
+                     const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
                      const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                      const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const;
 

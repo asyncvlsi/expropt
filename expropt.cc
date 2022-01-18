@@ -97,6 +97,17 @@ std::vector<T> zip_vvm(const std::vector<T1> &v1, const std::vector<T2> &v2, con
     return u;
 }
 
+template <typename T, typename K, typename T1, typename T2>
+std::unordered_map<K, T> zip_mm(const std::unordered_map<K, T1> &v1, const std::unordered_map<K, T2> &v2) {
+    std::unordered_map<K, T> u;
+    for (const auto &[k, _]: v1) assert(v2.contains(k));
+    for (const auto &[k, _]: v2) assert(v1.contains(k));
+    u.reserve(v1.size());
+    for (const auto &[k, t1]: v1)
+        u[k] = T{t1, v2.at(k)};
+    return u;
+}
+
 template <typename T, typename K, typename V>
 std::unordered_map<K, T> map_val_remap(const std::unordered_map<K, V> &m) {
     std::unordered_map<K, T> u;
@@ -384,7 +395,8 @@ void print_expression(FILE *output_stream, const Expr *e,
 // print a verilog module that will compute the Expr* in `out_exprs` given the `leaf_exprs` as inputs, using
 // `hidden_exprs` as intermediate values.
 void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
-                        const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
+                        const std::vector<const Expr *> &input_exprs,
+                        const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
                         const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                         const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) {
     if (!output_stream)
@@ -393,8 +405,8 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
     // first, build the lookup table for input expression names which will be used by the "print_expression" function.
     // The strings are kept alive in the original maps, so this is ok.
     std::unordered_map<const Expr *, const char *> name_from_leaf;
-    for (const auto &[leaf, name, _] : leaf_exprs) {
-        name_from_leaf[leaf] = name.c_str();
+    for (const auto &[leaf, nw] : leaf_map) {
+        name_from_leaf[leaf] = nw.name.c_str();
     }
 
     // Then output the verilog, starting with the module header
@@ -404,16 +416,16 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
     // now the ports for the header - first inputs
     bool first = true;
 
-    for (auto li_it = leaf_exprs.begin(); li_it != leaf_exprs.end(); ++li_it) {
+    for (auto li_it = input_exprs.begin(); li_it != input_exprs.end(); ++li_it) {
         if (first)
             first = false;
         else
             fprintf(output_stream, ", ");
-        std::string current = li_it->name;
+        std::string current = leaf_map.at(*li_it).name;
         bool skip = false;
         // omit ports with the same name
-        for (auto search_it = std::next(li_it); search_it != leaf_exprs.end(); ++search_it) {
-            std::string search = search_it->name;
+        for (auto search_it = std::next(li_it); search_it != input_exprs.end(); ++search_it) {
+            std::string search = leaf_map.at(*search_it).name;
             if (current == search) {
                 skip = true;
                 break;
@@ -448,12 +460,12 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
 
     // print input ports with bitwidth
     fprintf(output_stream, "\n\t// print input ports with bitwidth\n");
-    for (auto li = leaf_exprs.begin(); li != leaf_exprs.end(); ++li) {
+    for (auto li = input_exprs.begin(); li != input_exprs.end(); ++li) {
         // make sure you dont print a port 2+ times - the tools really dont like that
-        std::string current = li->name;
+        std::string current = leaf_map.at(*li).name;
         bool skip = false;
-        for (auto li_search = std::next(li); li_search != leaf_exprs.end(); li_search = std::next(li_search)) {
-            std::string search = li_search->name;
+        for (auto li_search = std::next(li); li_search != input_exprs.end(); li_search = std::next(li_search)) {
+            std::string search = leaf_map.at(*li_search).name;
             if (current == search) {
                 skip = true;
                 break;
@@ -462,7 +474,7 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
         if (skip)
             continue;
         // look up the bitwidth
-        int width = li->width;
+        int width = leaf_map.at(*li).width;
         if (width <= 0)
             fatal_error(
                 "ExternalExprOpt::print_expr_verilog error: Expression operands have incompatible bit widths\n");
@@ -650,24 +662,19 @@ ExternalExprOpt::ExternalExprOpt(ExprMappingSoftware datapath_syntesis_tool, Exp
 }
 ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const Expr *expr, int target_width,
                                                  const std::vector<ExprPtrWithIdAndWidth> &leafs) const {
-    // build the data structures need
-    std::vector<ExprPtrWithNameAndWidth> leaf_exprs, out_exprs;
+    std::vector<const Expr *> input_exprs;
+    std::unordered_map<const Expr *, NameWithWidth> leaf_map;
     for (const auto &[e, id, width] : leafs) {
-        leaf_exprs.push_back({e, string_format("%s%u", expr_prefix.data(), id), width});
+        input_exprs.push_back(e);
+        leaf_map[e] = {string_format("%s%u", expr_prefix.data(), id), width};
     }
+    auto out_exprs = std::vector<ExprPtrWithNameAndWidth>{{expr, "out", target_width}};
+    auto expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
 
-    out_exprs = {{expr, "out", target_width}};
-
-    // generate module name
-    std::string expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
-
-    return run_external_opt(expr_set_name, leaf_exprs, out_exprs, {});
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {});
 }
 
-/*
- * the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to
- * ExprOpt standart
- */
+// the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to ExprOpt standart
 [[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/,
                                                                   list_t *in_list, list_t *out_list,
                                                                   iHashtable *exprmap_int) const {
@@ -677,8 +684,6 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const Expr
 ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std::vector<std::pair<int, int>> &in_list,
                                                  const std::vector<std::pair<int, int>> &out_list,
                                                  const std::unordered_map<const Expr *, int> &exprmap_int) const {
-    // build the data structures need
-    std::vector<ExprPtrWithNameAndWidth> leaf_exprs, out_exprs;
 
     // Note: all the values in exprmap_int must be unique
     std::unordered_map<int, const Expr *> exprmap_int_inv;
@@ -687,13 +692,16 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
         exprmap_int_inv[v] = k;
     }
 
-    // convert input list, reverse searching nessesary, should always use last on multimatching
+    std::vector<const Expr *> input_exprs;
+    std::unordered_map<const Expr *, NameWithWidth> leaf_map;
     for (const auto &[li, li_width] : in_list) {
         const Expr *e = exprmap_int_inv.at(li);
         assert(e);
-        leaf_exprs.push_back({e, string_format("%s%u", expr_prefix.data(), li), li_width});
+        input_exprs.push_back(e);
+        leaf_map[e] = {string_format("%s%u", expr_prefix.data(), li), li_width};
     }
-    // do the exact same for the outlist!
+
+    std::vector<ExprPtrWithNameAndWidth> out_exprs;
     for (const auto &[li, li_width] : out_list) {
         const Expr *e = exprmap_int_inv.at(li);
         assert(e);
@@ -702,7 +710,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
     // generate module name
     auto expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
 
-    return run_external_opt(expr_set_name, leaf_exprs, out_exprs, {});
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {});
 }
 
 /**
@@ -717,10 +725,12 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
                                                                   iHashtable *c_out_width_map,
                                                                   list_t *c_hidden_exprs) const {
     // widths and names for the hidden expressions are in the c_out_width_map map
-    auto in_exprs =
-        zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_in_exprs),
-                                         map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map)),
-                                         to_imap<const Expr *, int>(c_in_width_map));
+    auto input_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map));
+    auto input_width_map = to_imap<const Expr *, int>(c_in_width_map);
+
+    auto input_exprs =to_vector<const Expr *>(c_in_exprs);
+
+    auto leaf_map = zip_mm<NameWithWidth>(input_name_map, input_width_map);
 
     auto out_width_map = to_imap<const Expr *, int>(c_out_width_map);
     auto out_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_out_name_map));
@@ -729,7 +739,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
     auto hidden_exprs =
         zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_hidden_exprs), out_name_map, out_width_map);
 
-    return run_external_opt(expr_set_name, in_exprs, out_exprs, hidden_exprs);
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs);
 }
 
 namespace {
@@ -833,10 +843,13 @@ double parse_abc_info(const char *file, double *area) {
                                                                   list_t *c_hidden_expr_names) const {
 
     // widths for the hidden expressions are in the c_out_width_map map
-    auto in_exprs =
-        zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_in_exprs),
-                                         map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map)),
-                                         to_imap<const Expr *, int>(c_in_width_map));
+
+
+    auto input_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map));
+    auto input_width_map = to_imap<const Expr *, int>(c_in_width_map);
+    auto input_exprs =to_vector<const Expr *>(c_in_exprs);
+    auto leaf_map = zip_mm<NameWithWidth>(input_name_map, input_width_map);
+
 
     auto out_width_map = to_imap<const Expr *, int>(c_out_width_map);
     auto out_exprs = zip_vvm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_out_exprs),
@@ -846,10 +859,11 @@ double parse_abc_info(const char *file, double *area) {
         to_vector<const Expr *>(c_hidden_exprs),
         vec_val_remap<std::string>(to_vector<const char *>(c_hidden_expr_names)), out_width_map);
 
-    return run_external_opt(expr_set_name, in_exprs, out_exprs, hidden_exprs);
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs);
 }
 ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_name,
-                                                 const std::vector<ExprPtrWithNameAndWidth> &leaf_exprs,
+                                                 const std::vector<const Expr *> &input_exprs,
+                                                 const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
                                                  const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                                                  const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const {
     ExprBlockInfo *info = nullptr;
@@ -875,7 +889,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
         fatal_error("ExternalExprOpt::run_external_opt: verilog file %s is not writable", verilog_file.data());
 
     // generate verilog module
-    print_expr_verilog(verilog_stream, expr_set_name, leaf_exprs, out_exprs, hidden_exprs);
+    print_expr_verilog(verilog_stream, expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs);
 
     // force write and close file
 
