@@ -125,9 +125,9 @@ struct NameWithWidth {
 class ExternalExprOpt {
   public:
     /// deprecated. Use new interface (probably the one below)
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(int expr_set_number, int targetwidth, const Expr *e, list_t *in_expr_list, iHashtable *in_expr_map,
-                     iHashtable *in_width_map) const;
+    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *e,
+                                                                   list_t *in_expr_list, iHashtable *in_expr_map,
+                                                                   iHashtable *in_width_map) const;
 
     /// Given an expression `e`, this will compute an optimized set of gates to compute `e` (resized to final width
     /// `target_width`), and append the set of gates to the output file. The generated block of gates will be named
@@ -142,9 +142,9 @@ class ExternalExprOpt {
                      const std::vector<ExprPtrWithIdAndWidth> &leafs) const;
 
     /// deprecated. Use a new interface
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(int expr_set_number, list_t *expr_list, list_t *in_list, list_t *out_list,
-                     iHashtable *exprmap) const;
+    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(int expr_set_number, list_t *expr_list,
+                                                                   list_t *in_list, list_t *out_list,
+                                                                   iHashtable *exprmap) const;
 
     /// Use one of the other interfaces. This one is bad!
     [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
@@ -153,10 +153,11 @@ class ExternalExprOpt {
                      const std::unordered_map<const Expr *, int> &exprmap_int) const;
 
     /// deprecated. Use new interface (probably the one below)
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map,
-                     list_t *out_expr_list, iHashtable *out_expr_map, iHashtable *out_width_map,
-                     list_t *hidden_expr_list = nullptr) const;
+    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list,
+                                                                   iHashtable *in_expr_map, iHashtable *in_width_map,
+                                                                   list_t *out_expr_list, iHashtable *out_expr_map,
+                                                                   iHashtable *out_width_map,
+                                                                   list_t *hidden_expr_list = nullptr) const;
 
     /// deprecated. Use new interface (probably the one below)
     [[maybe_unused]] [[nodiscard]] [[nodiscard]] ExprBlockInfo *
@@ -165,22 +166,19 @@ class ExternalExprOpt {
                      list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr) const;
 
     /// This will generate a series of gates to compute the expressions in `out_exprs.` It will do this using the inputs
-    /// in `input_exprs`, and by computing the intermediate values in `hidden_exprs`. It will copy out_exprs and hidden_exprs
-    /// with repeated names. `leaf_map` maps leaf holds both "input variable" leafs and "hidden variable" leafs. The name of the block of generated gates will be `expr_set_name.` The names in `leafs`,
-    /// `out_exprs` and `hidden_exprs` must be mutually disjoint.
+    /// in `input_exprs`, and by computing the intermediate values in `hidden_exprs`. It will copy out_exprs and
+    /// hidden_exprs with repeated names. `leaf_map` maps leaf holds both "input variable" leafs and "hidden variable"
+    /// leafs. The name of the block of generated gates will be `expr_set_name.` The names in `leafs`, `out_exprs` and
+    /// `hidden_exprs` must be mutually disjoint.
     [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(const std::string &expr_set_name,
-                     const std::vector<const Expr *> &input_exprs,
+    run_external_opt(const std::string &expr_set_name, const std::vector<const Expr *> &input_exprs,
                      const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
                      const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
                      const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const;
 
     /// deprecated. Use the new interface. Will be removed in a future version.
-    ExternalExprOpt(expr_mapping_software datapath_synthesis_tool,
-                                                            expr_mapping_target mapping_target, bool tie_cells,
-                                                            std::string expr_file_path = "",
-                                                            std::string exprid_prefix = "e",
-                                                            std::string block_prefix = "blk")
+    ExternalExprOpt(expr_mapping_software datapath_synthesis_tool, expr_mapping_target mapping_target, bool tie_cells,
+                    std::string expr_file_path = "", std::string exprid_prefix = "e", std::string block_prefix = "blk")
         : ExternalExprOpt(
               (datapath_synthesis_tool == expr_mapping_software::genus
                    ? ExprMappingSoftware::genus

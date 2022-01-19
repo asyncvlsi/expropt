@@ -100,10 +100,12 @@ std::vector<T> zip_vvm(const std::vector<T1> &v1, const std::vector<T2> &v2, con
 template <typename T, typename K, typename T1, typename T2>
 std::unordered_map<K, T> zip_mm(const std::unordered_map<K, T1> &v1, const std::unordered_map<K, T2> &v2) {
     std::unordered_map<K, T> u;
-    for (const auto &[k, _]: v1) assert(v2.contains(k));
-    for (const auto &[k, _]: v2) assert(v1.contains(k));
+    for (const auto &[k, _] : v1)
+        assert(v2.contains(k));
+    for (const auto &[k, _] : v2)
+        assert(v1.contains(k));
     u.reserve(v1.size());
-    for (const auto &[k, t1]: v1)
+    for (const auto &[k, t1] : v1)
         u[k] = T{t1, v2.at(k)};
     return u;
 }
@@ -136,6 +138,151 @@ template <typename... Args> [[nodiscard]] std::string string_format(const std::s
     return {buf.get(), buf.get() + size - 1}; // We don't want the '\0' inside
 }
 
+const char *binop_str(int type) {
+    switch (type) {
+    case E_AND:
+        return " & ";
+    case E_OR:
+        return " | ";
+    case E_XOR:
+        return " ^ ";
+    case E_PLUS:
+        return " + ";
+    case E_MINUS:
+        return " - ";
+    case E_MULT:
+        return " * ";
+    case E_DIV:
+        return " / ";
+    case E_MOD:
+        return " % ";
+    case E_LSL:
+        return " << ";
+    case E_LSR:
+        return " >> ";
+    case E_ASR:
+        return " >>> ";
+    case E_LT:
+        return " < ";
+    case E_GT:
+        return " > ";
+    case E_LE:
+        return " <= ";
+    case E_GE:
+        return " >= ";
+    case E_EQ:
+        return " == ";
+    case E_NE:
+        return " != ";
+    default:
+        fprintf(stderr, "type %d is not a binary op\n", type);
+        assert(false);
+        return "";
+    }
+}
+
+const char *unop_str(int type) {
+    switch (type) {
+    case E_UMINUS:
+        return "-";
+    case E_NOT:
+    case E_COMPLEMENT:
+        return "~";
+    default:
+        fprintf(stderr, "type %d is not a binary op\n", type);
+        assert(false);
+        return "";
+    }
+}
+//
+//// TODO just use the new IR in chp-optimize
+// int expr_width(const Expr *e, const std::unordered_map<const Expr *, NameWithWidth> &leaf_map) {
+//    switch (e->type) {
+//    case E_BUILTIN_BOOL:
+//        return 1;
+//    case E_BUILTIN_INT: {
+//        if (!e->u.e.r)
+//            return 1;
+//        return e->u.e.r->u.v;
+//    }
+//    case E_AND:
+//    case E_OR:
+//    case E_XOR:
+//        return std::max(expr_width(e->u.e.l, leaf_map), expr_width(e->u.e.r, leaf_map));
+//    case E_PLUS:
+//    case E_MINUS:
+//        return std::max(expr_width(e->u.e.l, leaf_map), expr_width(e->u.e.r, leaf_map)) + 1;
+//    case E_MULT:
+//        return expr_width(e->u.e.l, leaf_map) + expr_width(e->u.e.r, leaf_map);
+//    case E_DIV:
+//        return expr_width(e->u.e.l, leaf_map);
+//    case E_MOD:
+//        return expr_width(e->u.e.r, leaf_map);
+//    case E_LSL:
+//        return expr_width(e->u.e.l, leaf_map) + (1 << expr_width(e->u.e.r, leaf_map)) - 1;
+//    case E_LSR:
+//    case E_ASR:
+//        return expr_width(e->u.e.l, leaf_map);
+//    case E_LT:
+//    case E_GT:
+//    case E_LE:
+//    case E_GE:
+//    case E_EQ:
+//    case E_NE:
+//        return 1;
+//    case E_CONCAT:
+//        return expr_width(e->u.e.l, leaf_map) + expr_width(e->u.e.r, leaf_map);
+//    case E_COMPLEMENT:
+//    case E_NOT:
+//    case E_UMINUS:
+//        return expr_width(e->u.e.l, leaf_map);
+//    case E_INT:
+//        assert(!leaf_map.contains(e));
+//        return 64;
+//    case E_TRUE:
+//    case E_FALSE:
+//        assert(!leaf_map.contains(e));
+//        return 1;
+//    case E_REAL:
+//        assert(false);
+//    case E_VAR:
+//        return leaf_map.at(e).width;
+//    case E_QUERY:
+//        return std::max(expr_width(e->u.e.r->u.e.l, leaf_map), expr_width(e->u.e.r->u.e.r, leaf_map));
+//    case E_BITFIELD: {
+//        unsigned int l;
+//        unsigned int r;
+//        if (e->u.e.r->u.e.l) {
+//            l = (unsigned long)e->u.e.r->u.e.r->u.v;
+//            r = (unsigned long)e->u.e.r->u.e.l->u.v;
+//        } else {
+//            l = (unsigned long)e->u.e.r->u.e.r->u.v;
+//            r = l;
+//        }
+//        assert(l > r);
+//        return l - r + 1;
+//    }
+//    case E_COLON:
+//        fatal_error("E_COLON should have been handled by the E_QUERY case");
+//        break;
+//    case E_PROBE:
+//    case E_COMMA:
+//    case E_RAWFREE:
+//    case E_END:
+//    case E_NUMBER:
+//    case E_FUNCTION:
+//    case E_LPAR:
+//    case E_RPAR:
+//        fatal_error("%u should have been handled else where", e->type);
+//        break;
+//    default:
+//        fatal_error("%u not supported", e->type);
+//        break;
+//    }
+//    assert(false);
+//    return -1;
+//}
+
 /*
  * the recusive print method for the act expression data structure. it will use the hashtable expression map to get the
  * IDs for the variables and constants.
@@ -149,195 +296,245 @@ template <typename... Args> [[nodiscard]] std::string string_format(const std::s
  *
  * name_from_leaf Entries are required for E_VAR and E_BITFIELD, and are optional for E_INT, E_TRUE, and E_FALSE. If a
  * value is present for E_INT, E_TRUE, or E_FALSE, it will be used instead of the value stored in the expression.
+ *
+ * It returns a string which is the name of the temporary wire the expression was written into.
  */
-void print_expression(FILE *output_stream, const Expr *e,
-                      const std::unordered_map<const Expr *, const char *> &exprmap) {
-    fprintf(output_stream, "(");
+[[nodiscard]] NameWithWidth print_expression(FILE *output_stream, const Expr *e,
+                                             const std::unordered_map<const Expr *, NameWithWidth> &leaf_map) {
+    // http://yangchangwoo.com/podongii_X2/html/technote/TOOL/MANUAL/21i_doc/data/fndtn/ver/ver4_4.htm
+    static int shared_tmp_idx = 0;
+    auto new_tmp = [&]() { return string_format("etw%d", shared_tmp_idx++); };
+
+    // wire [w-1:0] tmp_name = expr
     switch (e->type) {
-    case E_BUILTIN_BOOL:
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " == 0 ? 1'b0 : 1'b1");
-        break;
-
-    case E_BUILTIN_INT:
-        if (!e->u.e.r) {
-            print_expression(output_stream, e->u.e.l, exprmap);
-        } else {
-            int v;
-            print_expression(output_stream, e->u.e.l, exprmap);
-            fprintf(output_stream, " & ");
-            v = e->u.e.r->u.v;
-            fprintf(output_stream, "%d'b", v);
-            for (int i = 0; i < v; i++) {
-                fprintf(output_stream, "1");
-            }
-        }
-        break;
-
-    case (E_AND):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " & ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_OR):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " | ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_NOT):
-        fprintf(output_stream, " ~");
-        print_expression(output_stream, e->u.e.l, exprmap);
-        break;
-    case (E_PLUS):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " + ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_MINUS):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " - ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_MULT):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " * ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_DIV):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " / ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_MOD):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " %% ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_LSL):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " << ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_LSR):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " >> ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_ASR):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " >>> ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_UMINUS):
-        fprintf(output_stream, " (-");
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, ")");
-        break;
-    case (E_INT): {
-        auto b = exprmap.find(e);
-        if (b != exprmap.end())
-            fprintf(output_stream, "%s", b->second);
-        else {
-            fprintf(output_stream, "64'd%lu", e->u.v);
-        }
+    case E_BUILTIN_BOOL: {
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        assert(lw > 0);
+        auto tmp_name = new_tmp();
+        auto tmp_w = 1;
+        fprintf(output_stream, "    wire [%d:0] %s = (%s == 0 ? 1'b0 : 1'b1);\n", tmp_w - 1, tmp_name.c_str(),
+                lname.c_str());
+        return {tmp_name, tmp_w};
     }
+    case E_BUILTIN_INT: {
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
 
-    break;
-    case (E_VAR): {
-        fprintf(output_stream, "%s", exprmap.at(e));
-    } break;
-    case (E_QUERY):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " ? ");
-        print_expression(output_stream, e->u.e.r->u.e.l, exprmap);
-        fprintf(output_stream, " : ");
-        print_expression(output_stream, e->u.e.r->u.e.r, exprmap);
-        break;
-    case (E_LPAR):
-        fprintf(output_stream, "LPAR\n");
-        fatal_error("%u not implemented", e->type);
-        break;
-    case (E_RPAR):
-        fprintf(output_stream, "RPAR\n");
-        fatal_error("%u not implemented", e->type);
-        break;
-    case (E_XOR):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " ^ ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_LT):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " < ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_GT):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " > ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_LE):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " <=");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_GE):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " >= ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_EQ):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " == ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_NE):
-        print_expression(output_stream, e->u.e.l, exprmap);
-        fprintf(output_stream, " != ");
-        print_expression(output_stream, e->u.e.r, exprmap);
-        break;
-    case (E_TRUE): {
-        auto b = exprmap.find(e);
-        if (b != exprmap.end())
-            fprintf(output_stream, "%s", b->second);
-        else
-            fprintf(output_stream, " 1'b1 ");
-    } break;
-    case (E_FALSE): {
-        auto b = exprmap.find(e);
-        if (b != exprmap.end())
-            fprintf(output_stream, "%s", b->second);
-        else
-            fprintf(output_stream, " 1'b0 ");
-    } break;
-    case (E_COLON):
-        fprintf(output_stream, " : ");
-        break;
-    case (E_PROBE):
-        fprintf(output_stream, "PROBE");
-        fatal_error("%u should have been handled else where", e->type);
-        break;
-    case (E_COMMA):
-        fprintf(output_stream, "COMMA");
-        fatal_error("%u should have been handled else where", e->type);
-        break;
-    case (E_CONCAT):
         if (!e->u.e.r) {
-            print_expression(output_stream, e->u.e.l, exprmap);
+            assert(lw == 1);
+            return {lname, lw};
+        }
+
+        assert(e->u.e.r->type == E_INT);
+        int w = e->u.e.r->u.v;
+        if (w == lw) {
+            return {lname, lw};
+        } else if (w > lw) {
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = { %d'd0, %s };\n", w - 1, tmp_name.c_str(), w - lw,
+                    lname.c_str());
+            return {tmp_name, w};
         } else {
-            const Expr *tmp = e;
-            fprintf(output_stream, "{");
-            while (tmp) {
-                print_expression(output_stream, tmp->u.e.l, exprmap);
-                if (tmp->u.e.r) {
-                    fprintf(output_stream, " ,");
-                }
-                tmp = tmp->u.e.r;
-            }
-            fprintf(output_stream, "}");
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = %s[%d:0];\n", w - 1, tmp_name.c_str(), lname.c_str(), w - 1);
+            return {tmp_name, w};
+        }
+        assert(false);
+        break;
+    }
+    case E_AND:
+    case E_OR:
+    case E_XOR: {
+        // Act width: std::max(lw, rw)
+        // Verilog width: std::max(lw, rw)
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        int w = std::max(lw, rw);
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), lname.c_str(),
+                binop_str(e->type), rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_PLUS:
+    case E_MINUS: {
+        // Act width: std::max(lw, rw) + 1
+        // Verilog width: std::max(lw, rw)
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        int w = std::max(lw, rw) + 1;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = {%d'd0, %s} %s {%d'd0, %s};\n", w - 1, tmp_name.c_str(), w - lw,
+                lname.c_str(), binop_str(e->type), w - rw, rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_MULT: {
+        // Act width: lw + rw
+        // Verilog width: std::max(lw, rw)
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        int w = lw + rw;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = {%d'd0, %s} %s {%d'd0, %s};\n", w - 1, tmp_name.c_str(), w - lw,
+                lname.c_str(), binop_str(e->type), w - rw, rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_DIV: {
+        // Act width: lw
+        // Verilog width: std::max(lw, rw)
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+
+        auto tn = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", std::max(lw, rw) - 1, tn.c_str(), lname.c_str(),
+                binop_str(e->type), rname.c_str());
+
+        int w = lw;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s[%d:0];\n", w - 1, tmp_name.c_str(), tn.c_str(), w - 1);
+        return {tmp_name, w};
+    }
+    case E_MOD: {
+        // Act width: rw
+        // Verilog width: std::max(lw, rw)
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+
+        auto tn = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", std::max(lw, rw) - 1, tn.c_str(), lname.c_str(),
+                binop_str(e->type), rname.c_str());
+
+        int w = rw;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s[%d:0];\n", w - 1, tmp_name.c_str(), tn.c_str(), w - 1);
+        return {tmp_name, w};
+    }
+    case E_LSL: {
+        // Act width: lw + (1 << rw) - 1
+        // Verilog width: lw
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        int w = lw + (1 << rw) - 1;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = {%d'd0, %s} %s %s;\n", w - 1, tmp_name.c_str(), w - lw,
+                lname.c_str(), binop_str(e->type), rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_LSR:
+    case E_ASR: {
+        // Act width: lw
+        // Verilog width: lw
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        assert(rw > 0);
+        int w = lw;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), lname.c_str(),
+                binop_str(e->type), rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_LT:
+    case E_GT:
+    case E_LE:
+    case E_GE:
+    case E_EQ:
+    case E_NE: {
+        // Act width: 1
+        // Verilog width: 1
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        assert(rw > 0);
+        assert(lw > 0);
+        int w = 1;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), lname.c_str(),
+                binop_str(e->type), rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_CONCAT: {
+        if (!e->u.e.r) {
+            return print_expression(output_stream, e->u.e.l, leaf_map);
+        }
+
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        int w = lw + rw; // same in verilog and act
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = { %s, %s };\n", w - 1, tmp_name.c_str(), lname.c_str(),
+                rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_COMPLEMENT:
+    case E_NOT:
+    case E_UMINUS: {
+        // Act width: lw
+        // Verilog width: lw
+        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        int w = lw; // same in act and verilog
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s;\n", w - 1, tmp_name.c_str(), unop_str(e->type),
+                lname.c_str());
+        return {tmp_name, w};
+    }
+    case E_INT: {
+        auto b = leaf_map.find(e);
+        if (b != leaf_map.end()) {
+            int w = b->second.width;
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = %s;\n", w - 1, tmp_name.c_str(), b->second.name.c_str());
+            return {tmp_name, w};
+        } else {
+            int w = 64;
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = 64'd%lu;\n", w - 1, tmp_name.c_str(), e->u.v);
+            return {tmp_name, w};
         }
         break;
-    case (E_BITFIELD):
+    }
+    case E_TRUE: {
+        auto b = leaf_map.find(e);
+        if (b != leaf_map.end()) {
+            int w = b->second.width;
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = %s;\n", w - 1, tmp_name.c_str(), b->second.name.c_str());
+            return {tmp_name, w};
+        } else {
+            int w = 64;
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = 1'b1;\n", w - 1, tmp_name.c_str());
+            return {tmp_name, w};
+        }
+        break;
+    }
+    case E_FALSE: {
+        auto b = leaf_map.find(e);
+        if (b != leaf_map.end()) {
+            int w = b->second.width;
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = %s;\n", w - 1, tmp_name.c_str(), b->second.name.c_str());
+            return {tmp_name, w};
+        } else {
+            int w = 64;
+            auto tmp_name = new_tmp();
+            fprintf(output_stream, "    wire [%d:0] %s = 1'b0;\n", w - 1, tmp_name.c_str());
+            return {tmp_name, w};
+        }
+        break;
+    }
+    case E_REAL:
+        assert(false);
+    case E_VAR:
+        return leaf_map.at(e);
+    case E_QUERY: {
+        auto [sname, sw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [lname, lw] = print_expression(output_stream, e->u.e.r->u.e.l, leaf_map);
+        auto [rname, rw] = print_expression(output_stream, e->u.e.r->u.e.r, leaf_map);
+        assert(sw == 1);
+        int w = std::max(lw, rw);
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s ? %s : %s;\n", w - 1, tmp_name.c_str(), sname.c_str(),
+                lname.c_str(), rname.c_str());
+        return {tmp_name, w};
+    }
+    case E_BITFIELD: {
         unsigned int l;
         unsigned int r;
         if (e->u.e.r->u.e.l) {
@@ -348,48 +545,32 @@ void print_expression(FILE *output_stream, const Expr *e,
             r = l;
         }
 
-        { fprintf(output_stream, "%s", exprmap.at(e)); }
-        fprintf(output_stream, " [");
-        if (l != r) {
-            fprintf(output_stream, "%i:", l);
-            fprintf(output_stream, "%i", r);
-        } else {
-            fprintf(output_stream, "%i", r);
-        }
-        fprintf(output_stream, "]");
+        assert(l >= r); // If not flip the l and r below?
+        int w = l - r + 1;
+        auto tmp_name = new_tmp();
+        fprintf(output_stream, "    wire [%d:0] %s = %s[%d:%d];\n", w - 1, tmp_name.c_str(),
+                leaf_map.at(e).name.c_str(), l, r);
+        return {tmp_name, w};
+    }
+    case E_COLON:
+        fatal_error("E_COLON should have been handled by the E_QUERY case");
         break;
-    case (E_COMPLEMENT):
-        fprintf(output_stream, " ~");
-        print_expression(output_stream, e->u.e.l, exprmap);
-        break;
-    case (E_REAL): {
-        auto b = exprmap.find(e);
-        if (b != exprmap.end())
-            fprintf(output_stream, "%s", b->second);
-        else
-            fprintf(output_stream, "64'd%lu", e->u.v);
-    } break;
-    case (E_RAWFREE):
-        fprintf(output_stream, "RAWFREE\n");
-        fatal_error("%u should have been handled else where", e->type);
-        break;
-    case (E_END):
-        fprintf(output_stream, "END\n");
-        fatal_error("%u should have been handled else where", e->type);
-        break;
-    case (E_NUMBER):
-        fprintf(output_stream, "NUMBER\n");
-        fatal_error("%u should have been handled else where", e->type);
-        break;
-    case (E_FUNCTION):
-        fprintf(output_stream, "FUNCTION\n");
+    case E_PROBE:
+    case E_COMMA:
+    case E_RAWFREE:
+    case E_END:
+    case E_NUMBER:
+    case E_FUNCTION:
+    case E_LPAR:
+    case E_RPAR:
         fatal_error("%u should have been handled else where", e->type);
         break;
     default:
-        fprintf(output_stream, "Whaaat?! %i\n", e->type);
+        fatal_error("%u not supported", e->type);
         break;
     }
-    fprintf(output_stream, ")");
+    assert(false);
+    return {"", -1};
 }
 
 // print a verilog module that will compute the Expr* in `out_exprs` given the `leaf_exprs` as inputs, using
@@ -401,13 +582,6 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
                         const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) {
     if (!output_stream)
         fatal_error("ExternalExprOpt::print_expr_verilog: verilog file is not writable");
-
-    // first, build the lookup table for input expression names which will be used by the "print_expression" function.
-    // The strings are kept alive in the original maps, so this is ok.
-    std::unordered_map<const Expr *, const char *> name_from_leaf;
-    for (const auto &[leaf, nw] : leaf_map) {
-        name_from_leaf[leaf] = nw.name.c_str();
-    }
 
     // Then output the verilog, starting with the module header
     fprintf(output_stream, "// generated expression module for %s\n\n\n", expr_set_name.c_str());
@@ -559,10 +733,10 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
             }
             if (skip)
                 continue;
-            // also print the hidden assigns
-            fprintf(output_stream, "\tassign %s = ", current.data());
-            print_expression(output_stream, e, name_from_leaf);
-            fprintf(output_stream, ";\n");
+
+            auto [ename, ew] = print_expression(output_stream, e, leaf_map);
+            assert(li->width == ew);
+            fprintf(output_stream, "\tassign %s = %s;\n", current.c_str(), ename.c_str());
         }
     }
 
@@ -572,9 +746,10 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
         for (const auto &out_expr : out_exprs) {
             const Expr *e = out_expr.e;
             std::string current = out_expr.name;
-            fprintf(output_stream, "\tassign %s = ", current.data());
-            print_expression(output_stream, e, name_from_leaf);
-            fprintf(output_stream, ";\n");
+
+            auto [ename, ew] = print_expression(output_stream, e, leaf_map);
+            assert(out_expr.width == ew);
+            fprintf(output_stream, "\tassign %s = %s;\n", current.c_str(), ename.c_str());
         }
         fprintf(output_stream, "\nendmodule\n");
     }
@@ -674,7 +849,8 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const Expr
     return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {});
 }
 
-// the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to ExprOpt standart
+// the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to
+// ExprOpt standart
 [[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/,
                                                                   list_t *in_list, list_t *out_list,
                                                                   iHashtable *exprmap_int) const {
@@ -728,7 +904,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std:
     auto input_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map));
     auto input_width_map = to_imap<const Expr *, int>(c_in_width_map);
 
-    auto input_exprs =to_vector<const Expr *>(c_in_exprs);
+    auto input_exprs = to_vector<const Expr *>(c_in_exprs);
 
     auto leaf_map = zip_mm<NameWithWidth>(input_name_map, input_width_map);
 
@@ -844,12 +1020,10 @@ double parse_abc_info(const char *file, double *area) {
 
     // widths for the hidden expressions are in the c_out_width_map map
 
-
     auto input_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map));
     auto input_width_map = to_imap<const Expr *, int>(c_in_width_map);
-    auto input_exprs =to_vector<const Expr *>(c_in_exprs);
+    auto input_exprs = to_vector<const Expr *>(c_in_exprs);
     auto leaf_map = zip_mm<NameWithWidth>(input_name_map, input_width_map);
-
 
     auto out_width_map = to_imap<const Expr *, int>(c_out_width_map);
     auto out_exprs = zip_vvm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_out_exprs),
@@ -940,13 +1114,15 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
                 if (constr) {
                     sprintf(
                         cmd,
-                        "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; hilomap -hicell "
+                        "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; opt_clean -purge; "
+                        "hilomap -hicell "
                         "TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
                         verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn, mapped_file.data(),
                         mapped_file.data());
                 } else {
                     sprintf(cmd,
-                            "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; hilomap -hicell TIEHIX1 Y "
+                            "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; opt_clean -purge; hilomap "
+                            "-hicell TIEHIX1 Y "
                             "-locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
                             verilog_file.data(), expr_set_name.c_str(), configreturn, mapped_file.data(),
                             mapped_file.data());
@@ -954,13 +1130,15 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
             } else {
                 if (constr) {
                     sprintf(cmd,
-                            "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; write_verilog  "
+                            "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; opt_clean "
+                            "-purge; write_verilog  "
                             "-nohex -nodec %s;\" | yosys > %s.log",
                             verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn,
                             mapped_file.data(), mapped_file.data());
                 } else {
                     sprintf(cmd,
-                            "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; write_verilog  -nohex "
+                            "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; opt_clean -purge; "
+                            "write_verilog  -nohex "
                             "-nodec %s;\" | yosys > %s.log",
                             verilog_file.data(), expr_set_name.c_str(), configreturn, mapped_file.data(),
                             mapped_file.data());
