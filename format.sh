@@ -1,4 +1,4 @@
 #!/usr/bin/bash
 
-clang-format -style=file -i expropt.cc expropt.h
-cmake-format -i CMakeLists.txt
+find src example -name "*.cc" -or -name "*.h" | xargs clang-format -style=file -i
+find -name CMakeLists.txt | xargs cmake-format -i

@@ -1,0 +1,2 @@
+add_executable(ExprOptExampleExe main.cc chpexprexample.cc chpexprexample.h)
+target_link_libraries(ExprOptExampleExe ExprOptLib)

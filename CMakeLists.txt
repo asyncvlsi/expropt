@@ -1,8 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ChpOptimizer)
+project(ExprOpt)
 enable_language(CXX)
 enable_testing()
+
+# ensure the environment is configured correctly. We were doing shared libraries
+# wrong before. The right way is to have their location added to LD_LIBRARY_PATH
+if(NOT DEFINED ENV{ACT_HOME})
+  message(
+    FATAL_ERROR "Set the enviroment variable 'ACT_HOME' to the install location"
+  )
+endif()
+string(REGEX MATCH "^(.*:)?$ENV{ACT_HOME}/lib/?(:.*)?$"
+             ACTHOME_LIB_IS_IN_LD_PATH $ENV{LD_LIBRARY_PATH})
+if(NOT ACTHOME_LIB_IS_IN_LD_PATH)
+  message(FATAL_ERROR "Add $ENV{ACT_HOME}/lib to LD_LIBRARY_PATH")
+endif()
+
 #
 include_directories($ENV{ACT_HOME}/include/)
 add_library(ActLang STATIC IMPORTED)
@@ -43,24 +57,10 @@ add_compile_options(-Wpointer-arith -Wunused-local-typedefs -Wunused-result
                     -Wvarargs -Wvla -Wwrite-strings)
 add_compile_options(-Wformat-security -Wundef)
 add_compile_options(-g -fsanitize=undefined -Werror)
-add_link_options(-ldl -fsanitize=undefined)
+add_link_options(-fsanitize=undefined)
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy; -checks=*; -warnings-as-errors=*;)
 
-# This is just for testing. Doesnt do a real build/install
-add_library(ExprOptLib STATIC expropt.h expropt.cc)
-add_library(ExprOptLibSh SHARED expropt.h expropt.cc)
-
-if(EXISTS ${EXPECTED_EXPROPTCOMM_PATH})
-  target_link_libraries(ExprOptLib ActLang ActCommon ActExprOptCommShared)
-  target_link_libraries(ExprOptLibSh ActLangSh ActCommonSh ActExprOptCommShared)
-else()
-  target_link_libraries(ExprOptLib ActLang ActCommon)
-  target_link_libraries(ExprOptLibSh ActLangSh ActCommonSh)
-endif()
-
-set_target_properties(ExprOptLib PROPERTIES OUTPUT_NAME "expropt")
-set_target_properties(ExprOptLibSh PROPERTIES OUTPUT_NAME "expropt_sh")
+add_subdirectory(src)
+add_subdirectory(example)
 
 install(FILES expropt.conf DESTINATION $ENV{ACT_HOME}/conf/generic/)
-install(FILES expropt.h DESTINATION $ENV{ACT_HOME}/include/act/)
-install(TARGETS ExprOptLib ExprOptLibSh DESTINATION $ENV{ACT_HOME}/lib/)
