@@ -20,7 +20,8 @@
  *
  **************************************************************************/
 
-#include <act/act.h>
+#include <act/lang/act.h>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -85,7 +86,7 @@ class ExprBlockInfo {
         , power_max_dynamic(e_power_max_dynamic)
         , area(e_area) {}
 
-    /// Construct a new Expr Block dummy with no extration results =>
+    /// Construct a new Expr Block dummy with no extraction results =>
     /// all 0, but delay_typ = -1 to indicate that the results were not
     /// created.
     ExprBlockInfo()
@@ -117,96 +118,7 @@ struct NameWithWidth {
     int width;
 };
 
-/**
- * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
- * it will also give you metadata back if the software supports it.
- * if you
- */
-class ExternalExprOpt {
-  public:
-    /// deprecated. Use new interface (probably the one below)
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(int expr_set_number, int targetwidth, const Expr *e,
-                                                                   list_t *in_expr_list, iHashtable *in_expr_map,
-                                                                   iHashtable *in_width_map) const;
-
-    /// Given an expression `e`, this will compute an optimized set of gates to compute `e` (resized to final width
-    /// `target_width`), and append the set of gates to the output file. The generated block of gates will be named
-    /// "<block_prefix><expr_set_number>" and the output will have name "out". All inputs will be named
-    /// "<expr_prefix><expr_id>"
-    /// @param expr the expression to be optimised and mapped
-    /// @param target_width what output width `e` should have
-    /// @param leafs an act list of expr leaf data structures/variables. Every expression of type E_VAR should be
-    /// present. Optionally, expressions of type E_INT, E_TRUE, and E_FALSE should also be present.
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(int expr_set_number, const Expr *expr, int target_width,
-                     const std::vector<ExprPtrWithIdAndWidth> &leafs) const;
-
-    /// deprecated. Use a new interface
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(int expr_set_number, list_t *expr_list,
-                                                                   list_t *in_list, list_t *out_list,
-                                                                   iHashtable *exprmap) const;
-
-    /// Use one of the other interfaces. This one is bad!
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(int expr_set_number, const std::vector<std::pair<int, int>> &in_list,
-                     const std::vector<std::pair<int, int>> &out_list,
-                     const std::unordered_map<const Expr *, int> &exprmap_int) const;
-
-    /// deprecated. Use new interface (probably the one below)
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list,
-                                                                   iHashtable *in_expr_map, iHashtable *in_width_map,
-                                                                   list_t *out_expr_list, iHashtable *out_expr_map,
-                                                                   iHashtable *out_width_map,
-                                                                   list_t *hidden_expr_list = nullptr) const;
-
-    /// deprecated. Use new interface (probably the one below)
-    [[maybe_unused]] [[nodiscard]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map,
-                     list_t *out_expr_list, list_t *out_expr_name_list, iHashtable *out_width_map,
-                     list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr) const;
-
-    /// This will generate a series of gates to compute the expressions in `out_exprs.` It will do this using the inputs
-    /// in `input_exprs`, and by computing the intermediate values in `hidden_exprs`. It will copy out_exprs and
-    /// hidden_exprs with repeated names. `leaf_map` maps leaf holds both "input variable" leafs and "hidden variable"
-    /// leafs. The name of the block of generated gates will be `expr_set_name.` The names in `leafs`, `out_exprs` and
-    /// `hidden_exprs` must be mutually disjoint.
-    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *
-    run_external_opt(const std::string &expr_set_name, const std::vector<const Expr *> &input_exprs,
-                     const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
-                     const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
-                     const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const;
-
-    /// deprecated. Use the new interface. Will be removed in a future version.
-    ExternalExprOpt(expr_mapping_software datapath_synthesis_tool, expr_mapping_target mapping_target, bool tie_cells,
-                    std::string expr_file_path = "", std::string exprid_prefix = "e", std::string block_prefix = "blk")
-        : ExternalExprOpt(
-              (datapath_synthesis_tool == expr_mapping_software::genus
-                   ? ExprMappingSoftware::genus
-                   : (datapath_synthesis_tool == expr_mapping_software::synopsis ? ExprMappingSoftware::synopsis
-                                                                                 : ExprMappingSoftware::yosys)),
-              (mapping_target == expr_mapping_target::bd ? ExprMappingTarget::bd : ExprMappingTarget::qdi),
-              tie_cells ? ShouldTieCells::yes : ShouldTieCells::no, std::move(expr_file_path), std::move(exprid_prefix),
-              std::move(block_prefix)) {}
-
-    /// @param datapath_synthesis_tool which optimization tool to use. Right now we support yosys, synopsis, and genus
-    /// @param mapping_target are we mapping for bundled data or qdi
-    /// @param tie_cells TODO I (Henry) am not sure what this does
-    /// @param expr_file_path the output file path, this is the file all the optimised expression blocks will be saved
-    /// to. if empty only metadata will be extracted.
-    /// @param exprid_prefix optional - the prefix for all in and outputs  - if integer id mode is used
-    /// @param block_prefix the prefix for the expression block - if integer id mode is used
-    ExternalExprOpt(ExprMappingSoftware datapath_synthesis_tool, ExprMappingTarget mapping_target,
-                    ShouldTieCells tie_cells, std::string expr_file_path = "", std::string exprid_prefix = "e",
-                    std::string block_prefix = "blk");
-    ~ExternalExprOpt() = default;
-
-    //  TODO abc timing is not known if printable.
-    /// work in progress value extraction from genus logs, area is also possible in abc
-    /// @param log_file_name the log file, actually the base name the individual reports are separate for each case
-    /// @return ExprBlockInfo* the datastructure with the result data
-    [[nodiscard]] static ExprBlockInfo *parse_genus_log(const std::string &log_file_name);
-
-  private:
+struct ExternalExprOptConfig {
     bool cleanup;
 
     /// the output file name where all act results are appended too.
@@ -222,19 +134,120 @@ class ExternalExprOpt {
     /// mode. default is "bool" for bd and "dualrail" for qdi
     std::string expr_channel_type;
 
-    /// if used in the integer mode the prefix for each expression in and out.
-    /// default is "e"
+    /// if used in the integer mode the prefix for each expression in and out. default is "e"
     std::string expr_prefix;
 
-    /// the module prefeix when used in integer mode. default is "blk"
+    /// the module prefix when used in integer mode. default is "blk"
     std::string module_prefix;
 
-    /// the software to be used for syntesis and mapping.
+    /// the software to be used for synthesis and mapping.
     ExprMappingSoftware mapper;
 
-    /// should tie cells be incerted by the syntesis software (true), or should v2act take cae of it (false)
+    /// should tie cells be inserted by the synthesis software (true), or should v2act take cae of it (false)
     ShouldTieCells use_tie_cells;
 
-    /// is it a bundeld data or dualrail pass?
+    /// is it a bundled data or dualrail pass?
     ExprMappingTarget wire_encoding;
+
+    /// @param datapath_synthesis_tool which optimization tool to use. Right now we support yosys, synopsis, and genus
+    /// @param mapping_target are we mapping for bundled data or qdi
+    /// @param tie_cells TODO I (Henry) am not sure what this does
+    /// @param expr_file_path the output file path, this is the file all the optimised expression blocks will be saved
+    /// to. if empty only metadata will be extracted.
+    /// @param expr_id_prefix optional - the prefix for all in and outputs  - if integer id mode is used
+    /// @param block_prefix the prefix for the expression block - if integer id mode is used
+    ExternalExprOptConfig(ExprMappingSoftware datapath_synthesis_tool, ExprMappingTarget mapping_target,
+                          ShouldTieCells tie_cells, std::string expr_file_path, std::string expr_id_prefix,
+                          std::string block_prefix);
+};
+
+/**
+ * ExternalExprOpt is an interface that wraps the synthesis, optimisation and mapping to cells of a set of act expr.
+ * it will also give you metadata back if the software supports it.
+ * if you
+ */
+class ExternalExprOpt {
+  public:
+    enum class Verbosity { None, Low, High };
+
+    /// deprecated. Use new interface (probably the one below)
+    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(int expr_set_number, int target_width, const Expr *e,
+                                                                   list_t *in_expr_list, iHashtable *in_expr_map,
+                                                                   iHashtable *in_width_map) const;
+
+    /// deprecated. Use a new interface
+    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(int expr_set_number, list_t *expr_list,
+                                                                   list_t *in_list, list_t *out_list,
+                                                                   iHashtable *expr_map) const;
+
+    /// Use one of the other interfaces. This one is bad!
+    [[maybe_unused]] [[nodiscard]] static ExprBlockInfo *
+    run_external_opt(int expr_set_number, const std::vector<std::pair<int, int>> &in_list,
+                     const std::vector<std::pair<int, int>> &out_list,
+                     const std::unordered_map<const Expr *, int> &expr_id_map, const ExternalExprOptConfig &config,
+                     std::optional<Verbosity> verbose = std::nullopt);
+
+    /// deprecated. Use new interface (probably the one below)
+    [[maybe_unused]] [[nodiscard]] ExprBlockInfo *run_external_opt(const char *expr_set_name, list_t *in_expr_list,
+                                                                   iHashtable *in_expr_map, iHashtable *in_width_map,
+                                                                   list_t *out_expr_list, iHashtable *out_expr_map,
+                                                                   iHashtable *out_width_map,
+                                                                   list_t *hidden_expr_list = nullptr) const;
+
+    /// deprecated. Use new interface (probably the one below)
+    [[maybe_unused]] [[nodiscard]] [[nodiscard]] ExprBlockInfo *
+    run_external_opt(const char *expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map,
+                     list_t *out_expr_list, list_t *out_expr_name_list, iHashtable *out_width_map,
+                     list_t *hidden_expr_list = nullptr, list_t *hidden_expr_name_list = nullptr,
+                     std::optional<Verbosity> verbose = std::nullopt) const;
+
+    /// Given an expression `e`, this will compute an optimized set of gates to compute `e` (resized to final width
+    /// `target_width`), and append the set of gates to the output file. The generated block of gates will be named
+    /// "<block_prefix><expr_set_number>" and the output will have name "out". All inputs will be named
+    /// "<expr_prefix><expr_id>"
+    /// @param expr the expression to be optimised and mapped
+    /// @param target_width what output width `e` should have
+    /// @param leafs an act list of expr leaf data structures/variables. Every expression of type E_VAR should be
+    /// present. Optionally, expressions of type E_INT, E_TRUE, and E_FALSE should also be present.
+    [[maybe_unused]] [[nodiscard]] static ExprBlockInfo *
+    run_external_opt(int expr_set_number, const Expr *expr, int target_width,
+                     const std::vector<ExprPtrWithIdAndWidth> &leafs, const ExternalExprOptConfig &config,
+                     std::optional<Verbosity> verbose = std::nullopt);
+
+    /// This will generate a series of gates to compute the expressions in `out_exprs.` It will do this using the inputs
+    /// in `input_exprs`, and by computing the intermediate values in `hidden_exprs`. It will copy out_exprs and
+    /// hidden_exprs with repeated names. `leaf_map` maps leaf holds both "input variable" leafs and "hidden variable"
+    /// leafs. The name of the block of generated gates will be `expr_set_name.` The names in `leafs`, `out_exprs` and
+    /// `hidden_exprs` must be mutually disjoint.
+    [[maybe_unused]] [[nodiscard]] static ExprBlockInfo *
+    run_external_opt(const std::string &expr_set_name, const std::vector<const Expr *> &input_exprs,
+                     const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
+                     const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
+                     const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs, const ExternalExprOptConfig &config,
+                     std::optional<Verbosity> verbose = std::nullopt);
+
+    /// deprecated. Use the new interface. Will be removed in a future version.
+    ExternalExprOpt(expr_mapping_software datapath_synthesis_tool, expr_mapping_target mapping_target, bool tie_cells,
+                    const std::string &expr_file_path = "", const std::string &expr_id_prefix = "e",
+                    const std::string &block_prefix = "blk")
+        : m_opt_config(ExternalExprOptConfig{
+              (datapath_synthesis_tool == expr_mapping_software::genus
+                   ? ExprMappingSoftware::genus
+                   : (datapath_synthesis_tool == expr_mapping_software::synopsis ? ExprMappingSoftware::synopsis
+                                                                                 : ExprMappingSoftware::yosys)),
+              (mapping_target == expr_mapping_target::bd ? ExprMappingTarget::bd : ExprMappingTarget::qdi),
+              tie_cells ? ShouldTieCells::yes : ShouldTieCells::no, expr_file_path, expr_id_prefix, block_prefix}) {}
+
+    ExternalExprOpt() = default;
+    ~ExternalExprOpt() = default;
+
+    //  TODO abc timing is not known if printable.
+    /// work in progress value extraction from genus logs, area is also possible in abc
+    /// @param log_file_name the log file, actually the base name the individual reports are separate for each case
+    /// @return ExprBlockInfo* the datastructure with the result data
+    [[nodiscard]] static ExprBlockInfo *parse_genus_log(const std::string &log_file_name);
+
+  private:
+    // TODO Hack to support old interface type. Remove once old interface is removed
+    std::optional<ExternalExprOptConfig> m_opt_config;
 };

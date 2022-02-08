@@ -22,8 +22,8 @@
 #ifndef __chpexprexample_H__
 #define __chpexprexample_H__
 
-#include <act/act.h>
-#include <act/expropt.h>
+#include "../src/expropt.h"
+#include <act/lang/act.h>
 #include <string>
 
 /**

@@ -20,11 +20,9 @@
  **************************************************************************
  */
 #include "chpexprexample.h"
-#include <act/act.h>
-#include <act/passes/netlist.h>
-#include <common/config.h>
-#include <stdio.h>
-#include <string.h>
+#include <act/lang/act.h>
+#include <cstdio>
+#include <cstring>
 #include <unistd.h>
 
 static void usage(char *name) {

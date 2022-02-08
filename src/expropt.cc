@@ -40,7 +40,7 @@ template <typename T> std::vector<T> to_vector(list_t *l) {
     return result;
 }
 
-std::vector<std::pair<int, int>> to_ipair_vector(list_t *l) {
+std::vector<std::pair<int, int>> to_int_pair_vector(list_t *l) {
     std::vector<std::pair<int, int>> result;
     for (auto li = list_first(l); li; li = list_next(li)) {
         auto t1 = list_ivalue(li);
@@ -138,7 +138,7 @@ template <typename... Args> [[nodiscard]] std::string string_format(const std::s
     return {buf.get(), buf.get() + size - 1}; // We don't want the '\0' inside
 }
 
-const char *binop_str(int type) {
+const char *binary_op_str(int type) {
     switch (type) {
     case E_AND:
         return " & ";
@@ -181,7 +181,7 @@ const char *binop_str(int type) {
     }
 }
 
-const char *unop_str(int type) {
+const char *unary_op_str(int type) {
     switch (type) {
     case E_UMINUS:
         return "-";
@@ -194,105 +194,18 @@ const char *unop_str(int type) {
         return "";
     }
 }
-//
-//// TODO just use the new IR in chp-optimize
-// int expr_width(const Expr *e, const std::unordered_map<const Expr *, NameWithWidth> &leaf_map) {
-//    switch (e->type) {
-//    case E_BUILTIN_BOOL:
-//        return 1;
-//    case E_BUILTIN_INT: {
-//        if (!e->u.e.r)
-//            return 1;
-//        return e->u.e.r->u.v;
-//    }
-//    case E_AND:
-//    case E_OR:
-//    case E_XOR:
-//        return std::max(expr_width(e->u.e.l, leaf_map), expr_width(e->u.e.r, leaf_map));
-//    case E_PLUS:
-//    case E_MINUS:
-//        return std::max(expr_width(e->u.e.l, leaf_map), expr_width(e->u.e.r, leaf_map)) + 1;
-//    case E_MULT:
-//        return expr_width(e->u.e.l, leaf_map) + expr_width(e->u.e.r, leaf_map);
-//    case E_DIV:
-//        return expr_width(e->u.e.l, leaf_map);
-//    case E_MOD:
-//        return expr_width(e->u.e.r, leaf_map);
-//    case E_LSL:
-//        return expr_width(e->u.e.l, leaf_map) + (1 << expr_width(e->u.e.r, leaf_map)) - 1;
-//    case E_LSR:
-//    case E_ASR:
-//        return expr_width(e->u.e.l, leaf_map);
-//    case E_LT:
-//    case E_GT:
-//    case E_LE:
-//    case E_GE:
-//    case E_EQ:
-//    case E_NE:
-//        return 1;
-//    case E_CONCAT:
-//        return expr_width(e->u.e.l, leaf_map) + expr_width(e->u.e.r, leaf_map);
-//    case E_COMPLEMENT:
-//    case E_NOT:
-//    case E_UMINUS:
-//        return expr_width(e->u.e.l, leaf_map);
-//    case E_INT:
-//        assert(!leaf_map.contains(e));
-//        return 64;
-//    case E_TRUE:
-//    case E_FALSE:
-//        assert(!leaf_map.contains(e));
-//        return 1;
-//    case E_REAL:
-//        assert(false);
-//    case E_VAR:
-//        return leaf_map.at(e).width;
-//    case E_QUERY:
-//        return std::max(expr_width(e->u.e.r->u.e.l, leaf_map), expr_width(e->u.e.r->u.e.r, leaf_map));
-//    case E_BITFIELD: {
-//        unsigned int l;
-//        unsigned int r;
-//        if (e->u.e.r->u.e.l) {
-//            l = (unsigned long)e->u.e.r->u.e.r->u.v;
-//            r = (unsigned long)e->u.e.r->u.e.l->u.v;
-//        } else {
-//            l = (unsigned long)e->u.e.r->u.e.r->u.v;
-//            r = l;
-//        }
-//        assert(l > r);
-//        return l - r + 1;
-//    }
-//    case E_COLON:
-//        fatal_error("E_COLON should have been handled by the E_QUERY case");
-//        break;
-//    case E_PROBE:
-//    case E_COMMA:
-//    case E_RAWFREE:
-//    case E_END:
-//    case E_NUMBER:
-//    case E_FUNCTION:
-//    case E_LPAR:
-//    case E_RPAR:
-//        fatal_error("%u should have been handled else where", e->type);
-//        break;
-//    default:
-//        fatal_error("%u not supported", e->type);
-//        break;
-//    }
-//    assert(false);
-//    return -1;
-//}
 
 /*
- * the recusive print method for the act expression data structure. it will use the hashtable expression map to get the
+ * the recursive print method for the act expression data structure. it will use the hashtable expression map to get the
  * IDs for the variables and constants.
  *
- * for the constants they can be either defined in the exprmap, than they are printed as inputs (for dualrail systems)
- * or if they are not in the exprmap, they will be printed as a constant in verilog for the tool to optimise and map to
- * tiecells (for bundled data)
+ * for the constants they can be either defined in the leaf_map, then they are printed as inputs (for dualrail systems)
+ * or if they are not in the leaf_map, they will be printed as a constant in verilog for the tool to optimise and map to
+ * tie-cells (for bundled data)
  *
- * the keys for the exprmaps are the pointers of the e of type E_VAR and optinal of E_INT, E_TRUE, E_FALSE (or E_REAL)
- * for dualrail. if a mapping exsists for these leaf types the mapping will be prefered over printing the value.
+ * the keys for leaf_map are the pointer to nodes with type E_VAR, E_BITFIELD, E_INT, E_TRUE, and E_FALSE. Every E_VAR
+ * and E_BITFIELD is required to be in the map. The other entries are optional. However, if a node with type E_INT,
+ * E_TRUE, or E_FALSE is in the map, its value will be preferred over the default value.
  *
  * name_from_leaf Entries are required for E_VAR and E_BITFIELD, and are optional for E_INT, E_TRUE, and E_FALSE. If a
  * value is present for E_INT, E_TRUE, or E_FALSE, it will be used instead of the value stored in the expression.
@@ -308,34 +221,34 @@ const char *unop_str(int type) {
     // wire [w-1:0] tmp_name = expr
     switch (e->type) {
     case E_BUILTIN_BOOL: {
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
         assert(lw > 0);
         auto tmp_name = new_tmp();
         auto tmp_w = 1;
         fprintf(output_stream, "    wire [%d:0] %s = (%s == 0 ? 1'b0 : 1'b1);\n", tmp_w - 1, tmp_name.c_str(),
-                lname.c_str());
+                l_name.c_str());
         return {tmp_name, tmp_w};
     }
     case E_BUILTIN_INT: {
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
 
         if (!e->u.e.r) {
             assert(lw == 1);
-            return {lname, lw};
+            return {l_name, lw};
         }
 
         assert(e->u.e.r->type == E_INT);
-        int w = e->u.e.r->u.v;
+        int w = (int)(e->u.e.r->u.v);
         if (w == lw) {
-            return {lname, lw};
+            return {l_name, lw};
         } else if (w > lw) {
             auto tmp_name = new_tmp();
             fprintf(output_stream, "    wire [%d:0] %s = { %d'd0, %s };\n", w - 1, tmp_name.c_str(), w - lw,
-                    lname.c_str());
+                    l_name.c_str());
             return {tmp_name, w};
         } else {
             auto tmp_name = new_tmp();
-            fprintf(output_stream, "    wire [%d:0] %s = %s[%d:0];\n", w - 1, tmp_name.c_str(), lname.c_str(), w - 1);
+            fprintf(output_stream, "    wire [%d:0] %s = %s[%d:0];\n", w - 1, tmp_name.c_str(), l_name.c_str(), w - 1);
             return {tmp_name, w};
         }
         assert(false);
@@ -346,46 +259,46 @@ const char *unop_str(int type) {
     case E_XOR: {
         // Act width: std::max(lw, rw)
         // Verilog width: std::max(lw, rw)
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         int w = std::max(lw, rw);
         auto tmp_name = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), lname.c_str(),
-                binop_str(e->type), rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), l_name.c_str(),
+                binary_op_str(e->type), r_name.c_str());
         return {tmp_name, w};
     }
     case E_PLUS:
     case E_MINUS: {
         // Act width: std::max(lw, rw) + 1
         // Verilog width: std::max(lw, rw)
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         int w = std::max(lw, rw) + 1;
         auto tmp_name = new_tmp();
         fprintf(output_stream, "    wire [%d:0] %s = {%d'd0, %s} %s {%d'd0, %s};\n", w - 1, tmp_name.c_str(), w - lw,
-                lname.c_str(), binop_str(e->type), w - rw, rname.c_str());
+                l_name.c_str(), binary_op_str(e->type), w - rw, r_name.c_str());
         return {tmp_name, w};
     }
     case E_MULT: {
         // Act width: lw + rw
         // Verilog width: std::max(lw, rw)
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         int w = lw + rw;
         auto tmp_name = new_tmp();
         fprintf(output_stream, "    wire [%d:0] %s = {%d'd0, %s} %s {%d'd0, %s};\n", w - 1, tmp_name.c_str(), w - lw,
-                lname.c_str(), binop_str(e->type), w - rw, rname.c_str());
+                l_name.c_str(), binary_op_str(e->type), w - rw, r_name.c_str());
         return {tmp_name, w};
     }
     case E_DIV: {
         // Act width: lw
         // Verilog width: std::max(lw, rw)
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
 
         auto tn = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", std::max(lw, rw) - 1, tn.c_str(), lname.c_str(),
-                binop_str(e->type), rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", std::max(lw, rw) - 1, tn.c_str(), l_name.c_str(),
+                binary_op_str(e->type), r_name.c_str());
 
         int w = lw;
         auto tmp_name = new_tmp();
@@ -395,12 +308,12 @@ const char *unop_str(int type) {
     case E_MOD: {
         // Act width: rw
         // Verilog width: std::max(lw, rw)
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
 
         auto tn = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", std::max(lw, rw) - 1, tn.c_str(), lname.c_str(),
-                binop_str(e->type), rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", std::max(lw, rw) - 1, tn.c_str(), l_name.c_str(),
+                binary_op_str(e->type), r_name.c_str());
 
         int w = rw;
         auto tmp_name = new_tmp();
@@ -410,25 +323,25 @@ const char *unop_str(int type) {
     case E_LSL: {
         // Act width: lw + (1 << rw) - 1
         // Verilog width: lw
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         int w = lw + (1 << rw) - 1;
         auto tmp_name = new_tmp();
         fprintf(output_stream, "    wire [%d:0] %s = {%d'd0, %s} %s %s;\n", w - 1, tmp_name.c_str(), w - lw,
-                lname.c_str(), binop_str(e->type), rname.c_str());
+                l_name.c_str(), binary_op_str(e->type), r_name.c_str());
         return {tmp_name, w};
     }
     case E_LSR:
     case E_ASR: {
         // Act width: lw
         // Verilog width: lw
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         assert(rw > 0);
         int w = lw;
         auto tmp_name = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), lname.c_str(),
-                binop_str(e->type), rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), l_name.c_str(),
+                binary_op_str(e->type), r_name.c_str());
         return {tmp_name, w};
     }
     case E_LT:
@@ -439,14 +352,14 @@ const char *unop_str(int type) {
     case E_NE: {
         // Act width: 1
         // Verilog width: 1
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         assert(rw > 0);
         assert(lw > 0);
         int w = 1;
         auto tmp_name = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), lname.c_str(),
-                binop_str(e->type), rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s %s;\n", w - 1, tmp_name.c_str(), l_name.c_str(),
+                binary_op_str(e->type), r_name.c_str());
         return {tmp_name, w};
     }
     case E_CONCAT: {
@@ -454,12 +367,12 @@ const char *unop_str(int type) {
             return print_expression(output_stream, e->u.e.l, leaf_map);
         }
 
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r, leaf_map);
         int w = lw + rw; // same in verilog and act
         auto tmp_name = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = { %s, %s };\n", w - 1, tmp_name.c_str(), lname.c_str(),
-                rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = { %s, %s };\n", w - 1, tmp_name.c_str(), l_name.c_str(),
+                r_name.c_str());
         return {tmp_name, w};
     }
     case E_COMPLEMENT:
@@ -467,11 +380,11 @@ const char *unop_str(int type) {
     case E_UMINUS: {
         // Act width: lw
         // Verilog width: lw
-        auto [lname, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.l, leaf_map);
         int w = lw; // same in act and verilog
         auto tmp_name = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s %s;\n", w - 1, tmp_name.c_str(), unop_str(e->type),
-                lname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s %s;\n", w - 1, tmp_name.c_str(), unary_op_str(e->type),
+                l_name.c_str());
         return {tmp_name, w};
     }
     case E_INT: {
@@ -524,24 +437,24 @@ const char *unop_str(int type) {
     case E_VAR:
         return leaf_map.at(e);
     case E_QUERY: {
-        auto [sname, sw] = print_expression(output_stream, e->u.e.l, leaf_map);
-        auto [lname, lw] = print_expression(output_stream, e->u.e.r->u.e.l, leaf_map);
-        auto [rname, rw] = print_expression(output_stream, e->u.e.r->u.e.r, leaf_map);
+        auto [s_name, sw] = print_expression(output_stream, e->u.e.l, leaf_map);
+        auto [l_name, lw] = print_expression(output_stream, e->u.e.r->u.e.l, leaf_map);
+        auto [r_name, rw] = print_expression(output_stream, e->u.e.r->u.e.r, leaf_map);
         assert(sw == 1);
         int w = std::max(lw, rw);
         auto tmp_name = new_tmp();
-        fprintf(output_stream, "    wire [%d:0] %s = %s ? %s : %s;\n", w - 1, tmp_name.c_str(), sname.c_str(),
-                lname.c_str(), rname.c_str());
+        fprintf(output_stream, "    wire [%d:0] %s = %s ? %s : %s;\n", w - 1, tmp_name.c_str(), s_name.c_str(),
+                l_name.c_str(), r_name.c_str());
         return {tmp_name, w};
     }
     case E_BITFIELD: {
-        unsigned int l;
-        unsigned int r;
+        int l;
+        int r;
         if (e->u.e.r->u.e.l) {
-            l = (unsigned long)e->u.e.r->u.e.r->u.v;
-            r = (unsigned long)e->u.e.r->u.e.l->u.v;
+            l = (int)((unsigned long)e->u.e.r->u.e.r->u.v);
+            r = (int)((unsigned long)e->u.e.r->u.e.l->u.v);
         } else {
-            l = (unsigned long)e->u.e.r->u.e.r->u.v;
+            l = (int)((unsigned long)e->u.e.r->u.e.r->u.v);
             r = l;
         }
 
@@ -635,7 +548,7 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
     // print input ports with bitwidth
     fprintf(output_stream, "\n\t// print input ports with bitwidth\n");
     for (auto li = input_exprs.begin(); li != input_exprs.end(); ++li) {
-        // make sure you dont print a port 2+ times - the tools really dont like that
+        // make sure you don't print a port 2+ times - the tools really don't like that
         std::string current = leaf_map.at(*li).name;
         bool skip = false;
         for (auto li_search = std::next(li); li_search != input_exprs.end(); li_search = std::next(li_search)) {
@@ -662,7 +575,7 @@ void print_expr_verilog(FILE *output_stream, const std::string &expr_set_name,
     {
         fprintf(output_stream, "\n\t// print output ports with bitwidth\n");
         for (auto li = out_exprs.begin(); li != out_exprs.end(); ++li) {
-            // make sure you dont print a port 2+ times - the tools really dont like that
+            // make sure you don't print a port 2+ times - the tools really don't like that
             std::string current = li->name;
             bool skip = false;
             // omit ports with the same name
@@ -781,144 +694,6 @@ double parse_and_return_max(std::string filename, std::string parse_format, doub
     return return_value;
 }
 
-} // namespace
-
-ExternalExprOpt::ExternalExprOpt(ExprMappingSoftware datapath_syntesis_tool, ExprMappingTarget mapping_target,
-                                 ShouldTieCells tie_cells, std::string expr_file_path, std::string exprid_prefix,
-                                 std::string block_prefix)
-    : expr_output_file(std::move(expr_file_path))
-    , expr_prefix(std::move(exprid_prefix))
-    , module_prefix(std::move(block_prefix))
-    , mapper(datapath_syntesis_tool)
-    , use_tie_cells(tie_cells)
-    , wire_encoding(mapping_target) {
-
-    config_set_default_int("expropt.clean_tmp_files", 1);
-    config_set_default_int("expropt.verbose", 1);
-    config_set_default_string("expropt.act_cell_lib_qdi_namespace", "syn");
-    config_set_default_string("expropt.act_cell_lib_qdi_wire_type", "sdtexprchan<1>");
-    config_set_default_string("expropt.act_cell_lib_bd_namespace", "syn");
-    config_set_default_string("expropt.act_cell_lib_bd_wire_type", "bool");
-
-    config_set_default_string("expropt.captable", "none");
-    config_set_default_string("expropt.lef", "none");
-    config_set_default_string("expropt.liberty_ff_hightemp", "none");
-    config_set_default_string("expropt.liberty_ff_lowtemp", "none");
-    config_set_default_string("expropt.liberty_ss_hightemp", "none");
-
-    config_set_default_real("expropt.default_load", 1.0);
-
-    config_read("expropt.conf");
-
-    switch (wire_encoding) {
-    case ExprMappingTarget::qdi:
-        cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
-        cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
-        expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
-        break;
-    case ExprMappingTarget::bd:
-        cell_act_file = config_get_string("expropt.act_cell_lib_bd");
-        cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
-        expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
-        break;
-    }
-    cleanup = config_get_int("expropt.clean_tmp_files");
-}
-
-// the a wrapper for chp2prs to just run the optimisation with a single expression
-[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int target_width,
-                                                                  const Expr *expr, list_t *in_expr_list,
-                                                                  iHashtable *in_expr_map,
-                                                                  iHashtable *in_width_map) const {
-    auto leafs =
-        zip_vmm<ExprPtrWithIdAndWidth>(to_vector<const Expr *>(in_expr_list), to_imap<const Expr *, int>(in_expr_map),
-                                       to_imap<const Expr *, int>(in_width_map));
-    return run_external_opt(expr_set_number, expr, target_width, leafs);
-}
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const Expr *expr, int target_width,
-                                                 const std::vector<ExprPtrWithIdAndWidth> &leafs) const {
-    std::vector<const Expr *> input_exprs;
-    std::unordered_map<const Expr *, NameWithWidth> leaf_map;
-    for (const auto &[e, id, width] : leafs) {
-        input_exprs.push_back(e);
-        leaf_map[e] = {string_format("%s%u", expr_prefix.data(), id), width};
-    }
-    auto out_exprs = std::vector<ExprPtrWithNameAndWidth>{{expr, "out", target_width}};
-    auto expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
-
-    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {});
-}
-
-// the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to
-// ExprOpt standart
-[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/,
-                                                                  list_t *in_list, list_t *out_list,
-                                                                  iHashtable *exprmap_int) const {
-    return run_external_opt(expr_set_number, to_ipair_vector(in_list), to_ipair_vector(out_list),
-                            to_imap<const Expr *, int>(exprmap_int));
-}
-ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const std::vector<std::pair<int, int>> &in_list,
-                                                 const std::vector<std::pair<int, int>> &out_list,
-                                                 const std::unordered_map<const Expr *, int> &exprmap_int) const {
-
-    // Note: all the values in exprmap_int must be unique
-    std::unordered_map<int, const Expr *> exprmap_int_inv;
-    for (auto &[k, v] : exprmap_int) {
-        assert(!exprmap_int_inv.contains(v));
-        exprmap_int_inv[v] = k;
-    }
-
-    std::vector<const Expr *> input_exprs;
-    std::unordered_map<const Expr *, NameWithWidth> leaf_map;
-    for (const auto &[li, li_width] : in_list) {
-        const Expr *e = exprmap_int_inv.at(li);
-        assert(e);
-        input_exprs.push_back(e);
-        leaf_map[e] = {string_format("%s%u", expr_prefix.data(), li), li_width};
-    }
-
-    std::vector<ExprPtrWithNameAndWidth> out_exprs;
-    for (const auto &[li, li_width] : out_list) {
-        const Expr *e = exprmap_int_inv.at(li);
-        assert(e);
-        out_exprs.push_back({e, string_format("%s%u", expr_prefix.data(), li), li_width});
-    }
-    // generate module name
-    auto expr_set_name = string_format("%s%u", module_prefix.data(), expr_set_number);
-
-    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {});
-}
-
-/**
- * first constuct the filenames for the temporary files and than generate the verilog, exc the external tool, read out
- * the results and convert them back to act.
- *
- * the printing of the verilog is seperate
- */
-[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
-                                                                  iHashtable *c_in_name_map, iHashtable *c_in_width_map,
-                                                                  list_t *c_out_exprs, iHashtable *c_out_name_map,
-                                                                  iHashtable *c_out_width_map,
-                                                                  list_t *c_hidden_exprs) const {
-    // widths and names for the hidden expressions are in the c_out_width_map map
-    auto input_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map));
-    auto input_width_map = to_imap<const Expr *, int>(c_in_width_map);
-
-    auto input_exprs = to_vector<const Expr *>(c_in_exprs);
-
-    auto leaf_map = zip_mm<NameWithWidth>(input_name_map, input_width_map);
-
-    auto out_width_map = to_imap<const Expr *, int>(c_out_width_map);
-    auto out_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_out_name_map));
-    auto out_exprs =
-        zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_out_exprs), out_name_map, out_width_map);
-    auto hidden_exprs =
-        zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_hidden_exprs), out_name_map, out_width_map);
-
-    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs);
-}
-
-namespace {
 double parse_abc_info(const char *file, double *area) {
     char buf[10240];
     FILE *fp;
@@ -1005,18 +780,64 @@ double parse_abc_info(const char *file, double *area) {
 }
 } // namespace
 
-/**
- * first constuct the filenames for the temporary files and than generate the verilog, exc the external tool, read out
- * the results and convert them back to act.
- *
- * the printing of the verilog is seperate
- */
+// ==================================== old interfaces =======================================
 
+// A wrapper for chp2prs to just run the optimisation with a single expression
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, int target_width,
+                                                                  const Expr *expr, list_t *in_expr_list,
+                                                                  iHashtable *in_expr_map,
+                                                                  iHashtable *in_width_map) const {
+    auto leafs =
+        zip_vmm<ExprPtrWithIdAndWidth>(to_vector<const Expr *>(in_expr_list), to_imap<const Expr *, int>(in_expr_map),
+                                       to_imap<const Expr *, int>(in_width_map));
+    assert(m_opt_config);
+    return run_external_opt(expr_set_number, expr, target_width, leafs, *m_opt_config);
+}
+
+// the wrapper for chp2prs to run sets of expressions like guards, uses chp2prs data structures and converts them to
+// ExprOpt standard
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, list_t * /*expr_list*/,
+                                                                  list_t *in_list, list_t *out_list,
+                                                                  iHashtable *exprmap_int) const {
+    assert(m_opt_config);
+    return run_external_opt(expr_set_number, to_int_pair_vector(in_list), to_int_pair_vector(out_list),
+                            to_imap<const Expr *, int>(exprmap_int), *m_opt_config);
+}
+
+// first construct the filenames for the temporary files and then generate the verilog, exc the external tool, read out
+// the results and convert them back to act. the printing of the verilog is separate
+[[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
+                                                                  iHashtable *c_in_name_map, iHashtable *c_in_width_map,
+                                                                  list_t *c_out_exprs, iHashtable *c_out_name_map,
+                                                                  iHashtable *c_out_width_map,
+                                                                  list_t *c_hidden_exprs) const {
+    // widths and names for the hidden expressions are in the c_out_width_map map
+    auto input_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_in_name_map));
+    auto input_width_map = to_imap<const Expr *, int>(c_in_width_map);
+
+    auto input_exprs = to_vector<const Expr *>(c_in_exprs);
+
+    auto leaf_map = zip_mm<NameWithWidth>(input_name_map, input_width_map);
+
+    auto out_width_map = to_imap<const Expr *, int>(c_out_width_map);
+    auto out_name_map = map_val_remap<std::string>(to_map<const Expr *, const char *>(c_out_name_map));
+    auto out_exprs =
+        zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_out_exprs), out_name_map, out_width_map);
+    auto hidden_exprs =
+        zip_vmm<ExprPtrWithNameAndWidth>(to_vector<const Expr *>(c_hidden_exprs), out_name_map, out_width_map);
+
+    assert(m_opt_config);
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs, *m_opt_config);
+}
+
+// first construct the filenames for the temporary files and then generate the verilog, exc the external tool, read out
+// the results and convert them back to act. The printing of the verilog is separate.
 [[maybe_unused]] ExprBlockInfo *ExternalExprOpt::run_external_opt(const char *expr_set_name, list_t *c_in_exprs,
                                                                   iHashtable *c_in_name_map, iHashtable *c_in_width_map,
                                                                   list_t *c_out_exprs, list_t *c_out_names,
                                                                   iHashtable *c_out_width_map, list_t *c_hidden_exprs,
-                                                                  list_t *c_hidden_expr_names) const {
+                                                                  list_t *c_hidden_expr_names,
+                                                                  std::optional<Verbosity> verbose) const {
 
     // widths for the hidden expressions are in the c_out_width_map map
 
@@ -1033,13 +854,132 @@ double parse_abc_info(const char *file, double *area) {
         to_vector<const Expr *>(c_hidden_exprs),
         vec_val_remap<std::string>(to_vector<const char *>(c_hidden_expr_names)), out_width_map);
 
-    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs);
+    assert(m_opt_config);
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, hidden_exprs, *m_opt_config, verbose);
 }
-ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_name,
-                                                 const std::vector<const Expr *> &input_exprs,
-                                                 const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
-                                                 const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
-                                                 const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs) const {
+
+// ==================================== new interfaces =========================================
+
+/*static*/ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number, const Expr *expr, int target_width,
+                                                            const std::vector<ExprPtrWithIdAndWidth> &leafs,
+                                                            const ExternalExprOptConfig &config,
+                                                            std::optional<Verbosity> verbose) {
+    std::vector<const Expr *> input_exprs;
+    std::unordered_map<const Expr *, NameWithWidth> leaf_map;
+    for (const auto &[e, id, width] : leafs) {
+        input_exprs.push_back(e);
+        leaf_map[e] = {string_format("%s%u", config.expr_prefix.data(), id), width};
+    }
+    auto out_exprs = std::vector<ExprPtrWithNameAndWidth>{{expr, "out", target_width}};
+    auto expr_set_name = string_format("%s%u", config.module_prefix.data(), expr_set_number);
+
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {}, config, verbose);
+}
+
+/*static*/ ExprBlockInfo *ExternalExprOpt::run_external_opt(int expr_set_number,
+                                                            const std::vector<std::pair<int, int>> &in_list,
+                                                            const std::vector<std::pair<int, int>> &out_list,
+                                                            const std::unordered_map<const Expr *, int> &exprmap_int,
+                                                            const ExternalExprOptConfig &config,
+                                                            std::optional<Verbosity> verbose) {
+
+    // Note: all the values in exprmap_int must be unique
+    std::unordered_map<int, const Expr *> exprmap_int_inv;
+    for (auto &[k, v] : exprmap_int) {
+        assert(!exprmap_int_inv.contains(v));
+        exprmap_int_inv[v] = k;
+    }
+
+    std::vector<const Expr *> input_exprs;
+    std::unordered_map<const Expr *, NameWithWidth> leaf_map;
+    for (const auto &[li, li_width] : in_list) {
+        const Expr *e = exprmap_int_inv.at(li);
+        assert(e);
+        input_exprs.push_back(e);
+        leaf_map[e] = {string_format("%s%u", config.expr_prefix.data(), li), li_width};
+    }
+
+    std::vector<ExprPtrWithNameAndWidth> out_exprs;
+    for (const auto &[li, li_width] : out_list) {
+        const Expr *e = exprmap_int_inv.at(li);
+        assert(e);
+        out_exprs.push_back({e, string_format("%s%u", config.expr_prefix.data(), li), li_width});
+    }
+    // generate module name
+    auto expr_set_name = string_format("%s%u", config.module_prefix.data(), expr_set_number);
+
+    return run_external_opt(expr_set_name, input_exprs, leaf_map, out_exprs, {}, config, verbose);
+}
+
+namespace {
+struct ActConfig {
+    std::string qdi_cell_act_file;
+    std::string qdi_cell_namespace;
+    std::string qdi_expr_channel_type;
+    std::string bd_cell_act_file;
+    std::string bd_cell_namespace;
+    std::string bd_expr_channel_type;
+    bool cleanup{};
+
+    double default_load{};
+    std::string liberty_tt_typtemp;
+    std::optional<int> abc_use_constraints;
+    int verbose{};
+};
+
+std::mutex mx; // hide the bit of unsafe code behind a mutex so we can call the rest of this in parallel
+ActConfig get_act_config() {
+    std::lock_guard guard{mx};
+    config_set_default_int("expropt.clean_tmp_files", 1);
+    config_set_default_int("expropt.verbose", 1);
+    config_set_default_string("expropt.act_cell_lib_qdi_namespace", "syn");
+    config_set_default_string("expropt.act_cell_lib_qdi_wire_type", "sdtexprchan<1>");
+    config_set_default_string("expropt.act_cell_lib_bd_namespace", "syn");
+    config_set_default_string("expropt.act_cell_lib_bd_wire_type", "bool");
+
+    config_set_default_string("expropt.captable", "none");
+    config_set_default_string("expropt.lef", "none");
+    config_set_default_string("expropt.liberty_ff_hightemp", "none");
+    config_set_default_string("expropt.liberty_ff_lowtemp", "none");
+    config_set_default_string("expropt.liberty_ss_hightemp", "none");
+
+    config_set_default_real("expropt.default_load", 1.0);
+
+    config_read("expropt.conf");
+
+    ActConfig result;
+    result.qdi_cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
+    result.qdi_cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
+    result.qdi_expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
+    result.bd_cell_act_file = config_get_string("expropt.act_cell_lib_bd");
+    result.bd_cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
+    result.bd_expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
+    result.cleanup = config_get_int("expropt.clean_tmp_files");
+
+    result.default_load = config_get_real("expropt.default_load");
+    result.liberty_tt_typtemp = config_get_string("expropt.liberty_tt_typtemp");
+    result.abc_use_constraints = config_exists("expropt.abc_use_constraints")
+                                     ? std::optional{config_get_int("expropt.abc_use_constraints")}
+                                     : std::nullopt;
+    result.verbose = config_get_int("expropt.verbose");
+
+    return result;
+}
+} // namespace
+
+/*static*/ ExprBlockInfo *
+ExternalExprOpt::run_external_opt(const std::string &expr_set_name, const std::vector<const Expr *> &input_exprs,
+                                  const std::unordered_map<const Expr *, NameWithWidth> &leaf_map,
+                                  const std::vector<ExprPtrWithNameAndWidth> &out_exprs,
+                                  const std::vector<ExprPtrWithNameAndWidth> &hidden_exprs,
+                                  const ExternalExprOptConfig &config, std::optional<Verbosity> verbose_opt) {
+    ActConfig act_config = get_act_config();
+
+    Verbosity verbose = verbose_opt               ? *verbose_opt
+                        : act_config.verbose == 0 ? Verbosity::None
+                        : act_config.verbose == 1 ? Verbosity::Low
+                                                  : Verbosity::High;
+
     ExprBlockInfo *info = nullptr;
     // consruct files names for the temp files
     std::string verilog_file = ".";
@@ -1077,7 +1017,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
     ExprOptCommercialHelper *helper = new ExprOptCommercialHelper();
 #endif
 
-    switch (mapper) {
+    switch (config.mapper) {
     case ExprMappingSoftware::genus:
 #ifdef FOUND_exproptcommercial
         if (expr_output_file.empty())
@@ -1099,32 +1039,30 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
         if (!verilog_stream) {
             fatal_error("Could not open `%s' file!", sdc_file.data());
         }
-        fprintf(verilog_stream, "set_load %g\n", config_get_real("expropt.default_load"));
+        fprintf(verilog_stream, "set_load %g\n", act_config.default_load);
         fclose(verilog_stream);
         // yosys gets its script passed via stdin (very short)
-        char *configreturn = config_get_string("expropt.liberty_tt_typtemp");
-        if (std::strcmp(configreturn, "none") != 0) {
+        const auto &configreturn = act_config.liberty_tt_typtemp;
+        if (configreturn != "none") {
             int constr = 0;
-            if (config_exists("expropt.abc_use_constraints")) {
-                if (config_get_int("expropt.abc_use_constraints") == 1) {
-                    constr = 1;
-                }
+            if (act_config.abc_use_constraints && *act_config.abc_use_constraints == 1) {
+                constr = 1;
             }
-            if (use_tie_cells == ShouldTieCells::yes) {
+            if (config.use_tie_cells == ShouldTieCells::yes) {
                 if (constr) {
                     sprintf(
                         cmd,
                         "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; opt_clean -purge; "
                         "hilomap -hicell "
                         "TIEHIX1 Y -locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-                        verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn, mapped_file.data(),
-                        mapped_file.data());
+                        verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn.c_str(),
+                        mapped_file.data(), mapped_file.data());
                 } else {
                     sprintf(cmd,
                             "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; opt_clean -purge; hilomap "
                             "-hicell TIEHIX1 Y "
                             "-locell TIELOX1 Y -singleton; write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-                            verilog_file.data(), expr_set_name.c_str(), configreturn, mapped_file.data(),
+                            verilog_file.data(), expr_set_name.c_str(), configreturn.c_str(), mapped_file.data(),
                             mapped_file.data());
                 }
             } else {
@@ -1133,26 +1071,28 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
                             "echo \"read_verilog %s; synth -noabc -top %s; abc -constr %s -liberty %s; opt_clean "
                             "-purge; write_verilog  "
                             "-nohex -nodec %s;\" | yosys > %s.log",
-                            verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn,
+                            verilog_file.data(), expr_set_name.c_str(), sdc_file.data(), configreturn.c_str(),
                             mapped_file.data(), mapped_file.data());
                 } else {
                     sprintf(cmd,
                             "echo \"read_verilog %s; synth -noabc -top %s; abc -liberty %s; opt_clean -purge; "
                             "write_verilog  -nohex "
                             "-nodec %s;\" | yosys > %s.log",
-                            verilog_file.data(), expr_set_name.c_str(), configreturn, mapped_file.data(),
+                            verilog_file.data(), expr_set_name.c_str(), configreturn.c_str(), mapped_file.data(),
                             mapped_file.data());
                 }
             }
         } else
             fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
-        if (config_get_int("expropt.verbose") == 2)
+        if (verbose == Verbosity::High)
             printf("running: %s \n", cmd);
-        else if (config_get_int("expropt.verbose") == 1) {
+        else if (verbose == Verbosity::Low) {
             printf(".");
             fflush(stdout);
         }
+
         exec_failure = system(cmd);
+
         if (exec_failure != 0)
             fatal_error("yosys syntesis failed: \"%s\" failed.", cmd);
         // @TODO do metadata extraction via ABC
@@ -1162,16 +1102,17 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
 
     // read the resulting netlist and map it back to act, if the wire_type is not bool use the async mode the specify a
     // wire type as a channel. skip if run was just for extraction of properties => output filename empty
-    if (!expr_output_file.empty()) {
-        if (expr_channel_type != "bool")
-            sprintf(cmd, "v2act -a -C \"%s\" -l %s -n %s %s >> %s", expr_channel_type.data(), cell_act_file.data(),
-                    cell_namespace.data(), mapped_file.data(), expr_output_file.data());
+    if (!config.expr_output_file.empty()) {
+        if (config.expr_channel_type != "bool")
+            sprintf(cmd, "v2act -a -C \"%s\" -l %s -n %s %s >> %s", config.expr_channel_type.data(),
+                    config.cell_act_file.data(), config.cell_namespace.data(), mapped_file.data(),
+                    config.expr_output_file.data());
         else
-            sprintf(cmd, "v2act -l %s -n %s %s >> %s", cell_act_file.data(), cell_namespace.data(), mapped_file.data(),
-                    expr_output_file.data());
-        if (config_get_int("expropt.verbose") == 2)
+            sprintf(cmd, "v2act -l %s -n %s %s >> %s", config.cell_act_file.data(), config.cell_namespace.data(),
+                    mapped_file.data(), config.expr_output_file.data());
+        if (verbose == Verbosity::High)
             printf("running: %s \n", cmd);
-        else if (config_get_int("expropt.verbose") == 1) {
+        else if (verbose == Verbosity::Low) {
             printf(".");
             fflush(stdout);
         }
@@ -1180,7 +1121,7 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
             fatal_error("external program call \"%s\" failed.", cmd);
     }
     // parce block info - WORK IN PROGRESS
-    switch (mapper) {
+    switch (config.mapper) {
     case ExprMappingSoftware::genus: {
 #ifdef FOUND_exproptcommercial
         std::string genus_log = mapped_file.data();
@@ -1210,8 +1151,8 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
     }
 
     // clean up temporary files
-    if (cleanup) {
-        switch (mapper) {
+    if (config.cleanup) {
+        switch (config.mapper) {
         case ExprMappingSoftware::genus:
             sprintf(cmd, "rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm genus.*",
                     mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data());
@@ -1222,9 +1163,9 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
                     sdc_file.data(), mapped_file.data());
             break;
         }
-        if (config_get_int("expropt.verbose") == 2)
+        if (verbose == Verbosity::High)
             printf("running: %s \n", cmd);
-        else if (config_get_int("expropt.verbose") == 1) {
+        else if (verbose == Verbosity::Low) {
             printf(".");
             fflush(stdout);
         }
@@ -1233,13 +1174,14 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
             warning("external program call \"%s\" failed.", cmd);
     }
     // add exports for namespace support
-    // @TODO sed calls are dangorus they change behavior depending on the version installed
-    if (!expr_output_file.empty()) {
+    // @TODO sed calls are dangerous they change behavior depending on the version installed
+    if (!config.expr_output_file.empty()) {
         sprintf(cmd, "sed -e 's/defproc/export defproc/' -e 's/export export/export/' %s > %sx && mv -f %sx %s",
-                expr_output_file.data(), expr_output_file.data(), expr_output_file.data(), expr_output_file.data());
-        if (config_get_int("expropt.verbose") == 2)
+                config.expr_output_file.data(), config.expr_output_file.data(), config.expr_output_file.data(),
+                config.expr_output_file.data());
+        if (verbose == Verbosity::High)
             printf("running: %s \n", cmd);
-        else if (config_get_int("expropt.verbose") == 1) {
+        else if (verbose == Verbosity::Low) {
             printf(".");
             fflush(stdout);
         }
@@ -1248,12 +1190,12 @@ ExprBlockInfo *ExternalExprOpt::run_external_opt(const std::string &expr_set_nam
             fatal_error("external program call \"%s\" failed.", cmd);
 
         // remove directions on in and outputs to avoid errors on passthrough connections
-        sprintf(cmd, "sed -e 's/[\\?!]//g' %s > %sx && mv -f %sx %s", expr_output_file.data(), expr_output_file.data(),
-                expr_output_file.data(), expr_output_file.data());
+        sprintf(cmd, "sed -e 's/[\\?!]//g' %s > %sx && mv -f %sx %s", config.expr_output_file.data(),
+                config.expr_output_file.data(), config.expr_output_file.data(), config.expr_output_file.data());
 
-        if (config_get_int("expropt.verbose") == 2)
+        if (verbose == Verbosity::High)
             printf("running: %s \n", cmd);
-        else if (config_get_int("expropt.verbose") == 1) {
+        else if (verbose == Verbosity::Low) {
             printf(".");
             fflush(stdout);
         }
@@ -1329,4 +1271,31 @@ ExprBlockInfo *ExternalExprOpt::parse_genus_log(const std::string &base_file_nam
 
     return new ExprBlockInfo(delay, delay_min, delay_max, power, power_max, area, power_static, power_dynamic,
                              power_max_static, power_max_dynamic);
+}
+
+ExternalExprOptConfig::ExternalExprOptConfig(ExprMappingSoftware datapath_synthesis_tool,
+                                             ExprMappingTarget mapping_target, ShouldTieCells tie_cells,
+                                             std::string expr_file_path, std::string exprid_prefix,
+                                             std::string block_prefix)
+    : expr_output_file(std::move(expr_file_path))
+    , expr_prefix(std::move(exprid_prefix))
+    , module_prefix(std::move(block_prefix))
+    , mapper(datapath_synthesis_tool)
+    , use_tie_cells(tie_cells)
+    , wire_encoding(mapping_target) {
+    auto act_config = get_act_config();
+
+    switch (wire_encoding) {
+    case ExprMappingTarget::qdi:
+        cell_act_file = act_config.qdi_cell_act_file;
+        cell_namespace = act_config.qdi_cell_namespace;
+        expr_channel_type = act_config.qdi_expr_channel_type;
+        break;
+    case ExprMappingTarget::bd:
+        cell_act_file = act_config.bd_cell_act_file;
+        cell_namespace = act_config.bd_cell_namespace;
+        expr_channel_type = act_config.bd_expr_channel_type;
+        break;
+    }
+    cleanup = act_config.cleanup;
 }

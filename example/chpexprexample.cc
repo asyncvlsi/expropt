@@ -20,7 +20,7 @@
  **************************************************************************
  */
 #include "chpexprexample.h"
-#include <act/types.h>
+#include <act/lang/types.h>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
