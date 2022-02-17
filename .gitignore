@@ -1,8 +1,3 @@
-*arm64*
-*x86_64*
-*i386_*
-*~
-*.deps
 tst/*
 test.prs
 output.act
@@ -10,6 +5,8 @@ prsim.out
 .DS_Store
 config_pkg.h
 config.mk
-*.so
 .cproject
 .project
+.idea/
+cmake-build-debug
+build/

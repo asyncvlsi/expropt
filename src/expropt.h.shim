@@ -1,0 +1,2 @@
+#pragma message "DEPRECATED ACT INCLUDE: prefer \'#include <act/expropt/expropt.h>\' to \'#include <act/expropt.h>\'"
+#include "act/expropt/expropt.h"
