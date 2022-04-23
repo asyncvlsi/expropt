@@ -505,6 +505,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   }
   // add exports for namespace support
   // @TODO sed calls are dangorus they change behavior depending on the version installed
+#if 0
   if (!expr_output_file.empty())
   {
     sprintf(cmd,"sed -e 's/defproc/export defproc/' -e 's/export export/export/' %s > %sx && mv -f %sx %s", expr_output_file.data(),expr_output_file.data(),
@@ -524,6 +525,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     exec_failure = system(cmd);
     if (exec_failure != 0) fatal_error("external program call \"%s\" failed.", cmd);
   }
+#endif
   return info;
 }
 
