@@ -401,7 +401,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   default:
     // yosys gets its script passed via stdin (very short)
     char* configreturn = config_get_string("expropt.liberty_tt_typtemp");
-    if (std::strcmp(configreturn,"none") != 0)
+    if (strcmp(configreturn,"none") != 0)
     {
       int constr = 0;
       if (config_exists ("expropt.abc_use_constraints")) {
@@ -1007,7 +1007,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
 
     // print the search paths if the files just have filenames not a full path
     configreturn = config_get_string("expropt.searchpath");
-    if (std::strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db init_lib_search_path \"%s\"\n",configreturn);
+    if (strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db init_lib_search_path \"%s\"\n",configreturn);
     
     // set settings to high (we jsut do logic syntesis) and force unix program behavior exit on fail
     fprintf(tcl_file, "set_db fail_on_error_mesg true\n");
@@ -1019,16 +1019,16 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
 
     // the library used for mapping
     configreturn = config_get_string("expropt.liberty_tt_typtemp");
-    if (std::strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db library_domain:tt_normaltemp .library { %s } \n", configreturn);
+    if (strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db library_domain:tt_normaltemp .library { %s } \n", configreturn);
     else fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
 
     // the lef for area reporting? somehow the liberty file does not do the trick
     configreturn = config_get_string("expropt.lef");
-    if (std::strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db lef_library { %s } \n", configreturn);
+    if (strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db lef_library { %s } \n", configreturn);
 
     // the cap table to get better wireload and drive strength estimations
     configreturn = config_get_string("expropt.captable");
-    if (std::strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db cap_table_file { %s } \n", configreturn);
+    if (strcmp(configreturn,"none") != 0) fprintf(tcl_file, "set_db cap_table_file { %s } \n", configreturn);
 
     // read and elaborate
     fprintf(tcl_file, "set_db hdl_array_naming_style %%s\\[%%d\\] \n");
@@ -1054,14 +1054,14 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
     bool delay_min = false, delay_max = false, typ = false, power_max = false;
     
     // dynamicly generate the alaysis corners depending on which files are provided in the configuration.
-    if (std::strcmp(configreturn3,"none") != 0)
+    if (strcmp(configreturn3,"none") != 0)
     {
       //fprintf(tcl_file, "setenv ENABLE_20NM_FEATURES TRUE\n");
       fprintf(tcl_file, "create_constraint_mode -name CONSTRAINT_MODE_1 -sdc_files { %s }\n", configreturn3);
       int configint = config_get_int("expropt.hightemp");
       configreturn = config_get_string("expropt.liberty_ss_hightemp");
       configreturn2 = config_get_string("expropt.qrc_rcmax");
-      if (std::strcmp(configreturn,"none") != 0 && std::strcmp(configreturn2,"none") != 0 && configint != 0) {
+      if (strcmp(configreturn,"none") != 0 && strcmp(configreturn2,"none") != 0 && configint != 0) {
         fprintf(tcl_file, "create_library_set -name LIB_SET_TIMING_SLOW -timing { %s }\n", configreturn);
         fprintf(tcl_file, "create_timing_condition -name TIMING_COND_SLOW -library_sets LIB_SET_TIMING_SLOW\n");
         fprintf(tcl_file, "create_rc_corner -name RC_CORNER_RCMAX_HIGHTEMP -temperature %d -qrc_tech %s\n", configint, configreturn2);
@@ -1073,7 +1073,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
       configint = config_get_int("expropt.lowtemp");
       configreturn = config_get_string("expropt.liberty_ff_lowtemp");
       configreturn2 = config_get_string("expropt.qrc_rcmin");
-      if (std::strcmp(configreturn,"none") != 0 && std::strcmp(configreturn2,"none") != 0 && configint != 0) {
+      if (strcmp(configreturn,"none") != 0 && strcmp(configreturn2,"none") != 0 && configint != 0) {
         fprintf(tcl_file, "create_library_set -name LIB_SET_TIMING_FAST -timing { %s }\n", configreturn);
         fprintf(tcl_file, "create_timing_condition -name TIMING_COND_FAST -library_sets LIB_SET_TIMING_FAST\n");
         fprintf(tcl_file, "create_rc_corner -name RC_CORNER_RCMIN_LOWTEMP -temperature %d -qrc_tech %s\n", configint, configreturn2);
@@ -1085,7 +1085,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
       configint = config_get_int("expropt.typtemp");
       configreturn = config_get_string("expropt.liberty_tt_typtemp");
       configreturn2 = config_get_string("expropt.qrc_rctyp");
-      if (std::strcmp(configreturn,"none") != 0 && std::strcmp(configreturn2,"none") != 0 && configint != 0) {
+      if (strcmp(configreturn,"none") != 0 && strcmp(configreturn2,"none") != 0 && configint != 0) {
         fprintf(tcl_file, "create_library_set -name LIB_SET_TYP -timing { %s }\n", configreturn);
         fprintf(tcl_file, "create_timing_condition -name TIMING_COND_TYP -library_sets LIB_SET_TYP\n");
         fprintf(tcl_file, "create_rc_corner -name RC_CORNER_RCTYP_TYPTEMP -temperature %d -qrc_tech %s\n", configint, configreturn2);
@@ -1097,7 +1097,7 @@ void ExternalExprOpt::generate_genus_tcl(const char *tcl_file_name, const char *
       configint = config_get_int("expropt.hightemp");
       configreturn = config_get_string("expropt.liberty_ff_hightemp");
       configreturn2 = config_get_string("expropt.qrc_rcmin");
-      if (std::strcmp(configreturn,"none") != 0 && std::strcmp(configreturn2,"none") != 0 && configint != 0) {
+      if (strcmp(configreturn,"none") != 0 && strcmp(configreturn2,"none") != 0 && configint != 0) {
         fprintf(tcl_file, "create_library_set -name LIB_SET_POWER_MAX -timing { %s }\n", configreturn);
         fprintf(tcl_file, "create_timing_condition -name TIMING_COND_MAX_POWER -library_sets LIB_SET_POWER_MAX\n");
         fprintf(tcl_file, "create_rc_corner -name RC_CORNER_RCMIN_MAXTEMP -temperature %d -qrc_tech %s\n", configint, configreturn2);
