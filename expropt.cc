@@ -325,6 +325,7 @@ static double parse_abc_info (const char *file, double *area)
       *area += _cell_info[i].area * _cell_info[i].count;
     }
   }
+  fclose (fp);
   return ret;
 }
 
