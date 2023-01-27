@@ -739,7 +739,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       int v;
       print_expression(output_stream, e->u.e.l, exprmap);
       fprintf (output_stream, " & ");
-      v = e->u.e.r->u.v;
+      v = e->u.e.r->u.ival.v;
       fprintf (output_stream, "%d'b", v);
       for (int i=0; i < v; i++) {
 	fprintf (output_stream, "1");
@@ -812,7 +812,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       b = ihash_lookup (exprmap, (long)(e));
       if (b) fprintf(output_stream, "%s", (char *)b->v);
       else {
-        fprintf(output_stream, "64'd%lu", e->u.v);
+        fprintf(output_stream, "64'd%lu", e->u.ival.v);
       }
     }
       
@@ -923,11 +923,11 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       unsigned int l;
       unsigned int r;
       if (e->u.e.r->u.e.l) {
-         l = (unsigned long) e->u.e.r->u.e.r->u.v;
-         r = (unsigned long) e->u.e.r->u.e.l->u.v;
+         l = (unsigned long) e->u.e.r->u.e.r->u.ival.v;
+         r = (unsigned long) e->u.e.r->u.e.l->u.ival.v;
       }
       else {
-         l = (unsigned long) e->u.e.r->u.e.r->u.v;
+         l = (unsigned long) e->u.e.r->u.e.r->u.ival.v;
          r = l;
       }
 
@@ -959,7 +959,7 @@ void ExternalExprOpt::print_expression(FILE *output_stream, Expr *e, iHashtable 
       ihash_bucket_t *b;
       b = ihash_lookup (exprmap, (long)(e));
       if (b) fprintf(output_stream, "%s", (char *)b->v);
-      else fprintf(output_stream, "64'd%lu", e->u.v);
+      else fprintf(output_stream, "64'd%lu", e->u.ival.v);
     }
       break;
     case (E_RAWFREE):
