@@ -236,7 +236,7 @@ void chpexprexample::search_expr (act_chp_lang_t *c)
           ihash_bucket_t *b_expr, *b_width;
           Expr* tmpexpr = new Expr();
           tmpexpr->type = E_TRUE;
-          tmpexpr->u.v = 1;
+          tmpexpr->u.ival.v = 1;
           b_expr = ihash_add(outexprmap,(long) tmpexpr);
           a->msnprintf(charbuf,1024,"guardTRUE");
           printf("added %p guard %s\n",charbuf,charbuf);
