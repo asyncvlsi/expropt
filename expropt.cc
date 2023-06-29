@@ -1018,8 +1018,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	  resw = bi->getWidth();
 	}
 	else {
-	  warning ("Int bitwidth unspecified (case 2)");
-	  resw = 64;
+	  resw = act_expr_intwidth (e->u.ival.v);
 	}
 	DUMP_DECL_ASSIGN;
 	if (bi) {
