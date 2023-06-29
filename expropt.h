@@ -26,6 +26,7 @@
 #include <string>
 #include <regex>
 #include <fstream>
+#include <unordered_map>
 
 /**
  * enum for referencing the mapper software type, to define which external syntesis tool to use for syntesis
@@ -344,10 +345,12 @@ private:
      * 
      * @param output_stream the file stream to be printed to
      * @param e the expression to be printed to
-     * @param exprmap the in_expr_map containing the leaf mappings, E_VAR mappings are required, 
-     * other leaf mappings are optional, but take precidence over printing the hard coded value.
+     * @param exprmap the in_expr_map containing the leaf mappings, E_VAR mappings are required, other leaf mappings are optional, but take precidence over
+     * printing the hard coded value. 
+     * @return the dummy idx that holds the result
      */
-    void print_expression(FILE *output_stream, Expr *e, iHashtable *exprmap);
+  int print_expression(FILE *output_stream, Expr *e, iHashtable *exprmap,
+		       int *width = NULL);
 
 
 
@@ -402,6 +405,22 @@ private:
      * is it a bundeld data or dualrail pass?
      */
     const expr_mapping_target wire_encoding;
+
+    /**
+     * used to generate dummy prefix for temp vars
+     */
+    char _dummy_prefix[10];
+    int _dummy_idx;
+    void _gen_dummy_id (char *buf, int sz, int idx) {
+      snprintf (buf, sz, "%s%d", _dummy_prefix, idx);
+    }
+    int _gen_fresh_idx () { return _dummy_idx++; }
+
+    /**
+     * This must be an E_VAR
+     */
+    std::unordered_map<Expr *, int> _varwidths;
+    int _get_bitwidth (Expr *e);
 
 };
 #endif
