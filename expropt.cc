@@ -355,7 +355,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   sdc_file.append(".sdc");
 
   std::string lec_out = ".";
-  lec_out.append ("./noneq.*.");
+  lec_out.append ("/noneq.*.");
   lec_out.append (expr_set_name);
   lec_out.append (".*");
 
