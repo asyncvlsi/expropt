@@ -41,6 +41,19 @@ ExternalExprOpt::~ExternalExprOpt()
 }
 
 /*
+ * Minimal API to abc
+ */
+extern "C" {
+
+  void Abc_Start ();
+  void Abc_Stop ();
+  typedef struct Abc_Frame_t_ Abc_Frame_t;
+  Abc_Frame_t *Abc_FrameGetGlobalFrame();
+  int Cmd_CommandExecute (Abc_Frame_t *pAbc, const char *sCommand);
+
+}
+
+/*
  * the a wrapper for chp2prs to just run the optimisation with a single expression,
  * 
  */
@@ -380,6 +393,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   ExprOptCommercialHelper *helper = new ExprOptCommercialHelper();
 #endif
 
+  char *configreturn;
+  
   switch (mapper)
   {
   case genus:
@@ -396,6 +411,70 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     // would need a sample script to implement this
     fatal_error("synopsis compiler is not implemented yet");
     break;
+
+  case abc:
+    /* create a .sdc file to get delay values */
+    verilog_stream = fopen (sdc_file.data(), "w");
+    if (!verilog_stream) {
+      fatal_error ("Could not open `%s' file!", sdc_file.data());
+    }
+    fprintf (verilog_stream, "set_load %g\n", config_get_real ("expropt.default_load"));
+    fclose (verilog_stream);
+    configreturn = config_get_string("expropt.liberty_tt_typtemp");
+
+    if (strcmp (configreturn, "none") == 0) {
+      fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
+    }
+
+    {
+      int constr = 0;
+      if (config_exists ("expropt.abc_use_constraints")) {
+	if (config_get_int ("expropt.abc_use_constraints") == 1) {
+	  constr = 1;
+	}
+      }
+
+      if (config_get_int("expropt.verbose") == 2) printf("running: %s \n",cmd);
+      else if (config_get_int("expropt.verbose") == 1) { printf("."); fflush(stdout); }
+    
+#if 0
+      Abc_Frame_t *pAbc;
+      Abc_Start ();
+      pAbc = Abc_FrameGetGlobalFrame ();
+      char cmdbuf[1024];
+
+#define RUN_ABC								\
+      do {								\
+	if ( Cmd_CommandExecute (pAbc, cmdbuf) ) {			\
+	  fatal_error ("Could not execute command `%s'", cmdbuf);	\
+	}								\
+      } while (0)
+
+      snprintf (cmdbuf, 1024, "set abcout %s.log; set abcout %s.err",
+		mapped_file.data(), mapped_file.data());
+      RUN_ABC;
+    
+      snprintf (cmdbuf, 1024, "%%read %s; %%blast; &put", verilog_file.data());
+      RUN_ABC;
+
+      snprintf (cmdbuf, 1024, "read_lib -v %s; balance; rewrite -l; refactor -l; balance; rewrite -l; rewrite -lz; balance; refactor -lz; rewrite -lz; balance",
+		configreturn);
+      RUN_ABC;
+
+      if (constr) {
+	snprintf (cmdbuf, 1024, "read constr %s", configreturn,
+		  sdc_file.data());
+	RUN_ABC;
+      }
+    
+      snprintf (cmdbuf, 1024, "strash; ifraig; dc2; strash; &get -n; &dch -f; &nf; &put; upsize; dnsize; write_verilog %s", mapped_file.data());
+      RUN_ABC;
+    
+      Abc_Stop();
+#endif
+    }
+    break;
+    
   case yosys:
     {
       /* create a .sdc file to get delay values */
@@ -408,7 +487,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     }
   default:
     // yosys gets its script passed via stdin (very short)
-    char* configreturn = config_get_string("expropt.liberty_tt_typtemp");
+    configreturn = config_get_string("expropt.liberty_tt_typtemp");
     if (strcmp(configreturn,"none") != 0)
     {
       int constr = 0;
@@ -482,6 +561,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     fatal_error("synopsis compiler are not implemented yet");
     break;
   case yosys:
+  case abc:
   default:
     { double delay, area;
       area = 0.0;
@@ -501,6 +581,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
       break;
     case synopsis:
     case yosys:
+    case abc:
     default:
       sprintf(cmd,"rm %s && rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(),
 	      sdc_file.data(), mapped_file.data());

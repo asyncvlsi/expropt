@@ -23,6 +23,7 @@ LIB=libexpropt_$(EXT).a
 SHLIB=libexpropt_sh_$(EXT).so
 
 include config.mk
+include ../abc/readline.mk
 
 TARGETLIBS=$(LIB) $(SHLIB)
 
@@ -42,6 +43,12 @@ else
 EXPRCOMLIB=
 endif
 
+ifdef FOUND_READLINE
+RLIBS=$(READLINELIB) -lreadline
+else
+RLIBS=
+endif
+
 SHOBJS=$(OBJS:.o=.os)
 
 SRCS= $(OBJS2:.o=.cc)
@@ -55,7 +62,7 @@ $(LIB): $(OBJS)
 	$(RANLIB) $(LIB)
 
 $(SHLIB): $(SHOBJS) 
-	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB)
+	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB) -labc $(RLIBS)
 
 SUBDIRS=example
 

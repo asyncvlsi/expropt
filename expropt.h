@@ -32,9 +32,10 @@
  * enum for referencing the mapper software type, to define which external syntesis tool to use for syntesis
  */
 enum expr_mapping_software {
-        yosys = 0,
-        synopsis = 1,
-        genus = 2
+        abc = 0,
+        yosys = 1,
+        synopsis = 2,
+        genus = 3
     };
 
 /**
