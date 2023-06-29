@@ -354,6 +354,11 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   sdc_file.append(expr_set_name);
   sdc_file.append(".sdc");
 
+  std::string lec_out = ".";
+  lec_out.append ("./noneq.*.");
+  lec_out.append (expr_set_name);
+  lec_out.append (".*");
+
   // open temp verilog file to be syntesised
 
   verilog_stream = fopen(verilog_file.data(), "w");
@@ -492,7 +497,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
     switch (mapper)
     {
     case genus:
-      sprintf(cmd,"rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm genus.*", mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data());
+      sprintf(cmd,"rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm %s && rm genus.*", mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data(), lec_out.data());
       break;
     case synopsis:
     case yosys:
