@@ -419,7 +419,7 @@ private:
     /**
      * This must be an E_VAR
      */
-    std::unordered_map<Expr *, int> _varwidths;
+    std::unordered_map<std::string, int> _varwidths;
     int _get_bitwidth (Expr *e);
 
 };

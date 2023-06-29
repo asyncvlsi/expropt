@@ -633,7 +633,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     if ( width <=0 ) fatal_error("ExternalExprOpt::print_expr_verilog error: Expression operands have incompatible bit widths\n");
     else if (width == 1) fprintf(output_stream, "\tinput %s ;\n", current.data());
     else fprintf(output_stream, "\tinput [%i:0] %s ;\n", width-1, current.data());
-    _varwidths[(Expr *)list_value (li)] = width;
+    _varwidths[current] = width;
   }
 
   // print output ports with bitwidth
@@ -661,7 +661,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     if ( width <=0 ) fatal_error("chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
     else if (width == 1) fprintf(output_stream, "\toutput %s ;\n", current.data());
     else fprintf(output_stream, "\toutput [%i:0] %s ;\n", width-1, current.data());
-    _varwidths[(Expr *)list_value (li)] = width;
+    _varwidths[current] = width;
   }
 
   //the hidden logic statements
@@ -692,7 +692,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       else if (width == 1) fprintf(output_stream, "\twire %s ;\n", current.data());
       else fprintf(output_stream, "\twire [%i:0] %s ;\n", width-1, current.data());
       list_append (all_names, current.data());
-      _varwidths[(Expr *)list_value (li)] = width;
+      _varwidths[current] = width;
     }
   }
 
@@ -1030,16 +1030,18 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     
     case (E_VAR):
     {
-      if (_varwidths.find (e) != _varwidths.end()) {
-	ihash_bucket_t *b;
-	b = ihash_lookup (exprmap, (long)(e));
-	Assert (b, "variable not found in variable map");
-	resw = _varwidths[e];
+      ihash_bucket_t *b;
+      std::string tmp;
+      b = ihash_lookup (exprmap, (long)(e));
+      Assert (b, "variable not found in variable map");
+      tmp = (char *)b->v;
+      if (_varwidths.find (tmp) != _varwidths.end()) {
+	resw = _varwidths[tmp];
 	DUMP_DECL_ASSIGN;
 	fprintf (output_stream, "%s", (char *)b->v);
       }
       else {
-	fatal_error ("Could not find bitwidth for variable!\n");
+	fatal_error ("Could not find bitwidth for variable %s!\n", (char *)b->v);
       }
     }
     break;
