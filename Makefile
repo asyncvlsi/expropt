@@ -42,14 +42,9 @@ else
 EXPRCOMLIB=
 endif
 
-ifdef FOUND_READLINE
-RLIBS=$(READLINELIB) -lreadline
-else
-RLIBS=
-endif
-
 ifdef abc_LIBDIR
-RLIBS := $(abc_LIBDIR) -labc $(RLIBS)
+RLIBS := $(abc_LIBDIR) -labc
+RLIBS_SO := $(abc_LIBDIR) $(ACT_HOME)/lib/libabc.so
 else
 RLIBS=
 endif
@@ -67,7 +62,7 @@ $(LIB): $(OBJS)
 	$(RANLIB) $(LIB)
 
 $(SHLIB): $(SHOBJS) 
-	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB) $(RLIBS)
+	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB) $(RLIBS_SO)
 
 SUBDIRS=example
 
