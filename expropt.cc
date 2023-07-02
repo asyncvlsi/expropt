@@ -27,9 +27,14 @@
 #include <act/exproptcommercial.h>
 #endif
 
+#ifndef FOUND_abc
+#error "Please use cmake to install the abc package from https://github.com/asyncvlsi/abc"
+#endif
+
 #include <act/types.h>
 #include <common/int.h>
 #include <string.h>
+#include "abc_api.h"
 
 /**
  * Destroy the External Expr Opt:: External Expr Opt object
@@ -38,19 +43,10 @@
  */
 ExternalExprOpt::~ExternalExprOpt()
 {
-}
-
-/*
- * Minimal API to abc
- */
-extern "C" {
-
-  void Abc_Start ();
-  void Abc_Stop ();
-  typedef struct Abc_Frame_t_ Abc_Frame_t;
-  Abc_Frame_t *Abc_FrameGetGlobalFrame();
-  int Cmd_CommandExecute (Abc_Frame_t *pAbc, const char *sCommand);
-
+  if (_abc_api) {
+    AbcApi *x = (AbcApi *) _abc_api;
+    delete x;
+  }
 }
 
 /*
@@ -353,17 +349,18 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
 {
   ExprBlockInfo* info = NULL;
   // consruct files names for the temp files
-  std::string verilog_file = ".";
-  verilog_file.append("/exprop_");
+  std::string verilog_file = "./";
+  verilog_file.append(VERILOG_FILE_PREFIX);
   verilog_file.append(expr_set_name);
   std::string mapped_file = verilog_file.data();
   verilog_file.append(".v");
-  mapped_file.append("_mapped.v");
+  mapped_file.append(MAPPED_FILE_SUFFIX);
+  mapped_file.append(".v");
   char cmd[4096] = "";
   FILE *verilog_stream;
 
-  std::string sdc_file = ".";
-  sdc_file.append("/exprop_");
+  std::string sdc_file = "./";
+  sdc_file.append(VERILOG_FILE_PREFIX);
   sdc_file.append(expr_set_name);
   sdc_file.append(".sdc");
 
@@ -379,7 +376,15 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
 
   // generate verilog module
 
-  print_expr_verilog(verilog_stream, expr_set_name, in_expr_list, in_expr_map, in_width_map, out_expr_list, out_expr_name_list, out_width_map, hidden_expr_list, hidden_expr_name_list);
+  if (mapper == abc) {
+    /* abc is going to mess up the port names, so we need to fix that */
+    char buf[1024];
+    snprintf (buf, 1024, "%stmp", expr_set_name);
+    print_expr_verilog(verilog_stream, buf, in_expr_list, in_expr_map, in_width_map, out_expr_list, out_expr_name_list, out_width_map, hidden_expr_list, hidden_expr_name_list);
+  }
+  else {
+    print_expr_verilog(verilog_stream, expr_set_name, in_expr_list, in_expr_map, in_width_map, out_expr_list, out_expr_name_list, out_width_map, hidden_expr_list, hidden_expr_name_list);
+  }
 
   // force write and close file
 
@@ -394,6 +399,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
 #endif
 
   char *configreturn;
+  AbcApi *a_api;
   
   switch (mapper)
   {
@@ -426,52 +432,28 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
       fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
     }
 
+    // expr_set_name is the name of the top-level module
     {
-      int constr = 0;
-      if (config_exists ("expropt.abc_use_constraints")) {
-	if (config_get_int ("expropt.abc_use_constraints") == 1) {
-	  constr = 1;
-	}
-      }
-
       if (config_get_int("expropt.verbose") == 2) printf("running: %s \n",cmd);
       else if (config_get_int("expropt.verbose") == 1) { printf("."); fflush(stdout); }
-    
-#if 0
-      Abc_Frame_t *pAbc;
-      Abc_Start ();
-      pAbc = Abc_FrameGetGlobalFrame ();
-      char cmdbuf[1024];
-
-#define RUN_ABC								\
-      do {								\
-	if ( Cmd_CommandExecute (pAbc, cmdbuf) ) {			\
-	  fatal_error ("Could not execute command `%s'", cmdbuf);	\
-	}								\
-      } while (0)
-
-      snprintf (cmdbuf, 1024, "set abcout %s.log; set abcout %s.err",
-		mapped_file.data(), mapped_file.data());
-      RUN_ABC;
-    
-      snprintf (cmdbuf, 1024, "%%read %s; %%blast; &put", verilog_file.data());
-      RUN_ABC;
-
-      snprintf (cmdbuf, 1024, "read_lib -v %s; balance; rewrite -l; refactor -l; balance; rewrite -l; rewrite -lz; balance; refactor -lz; rewrite -lz; balance",
-		configreturn);
-      RUN_ABC;
-
-      if (constr) {
-	snprintf (cmdbuf, 1024, "read constr %s", configreturn,
-		  sdc_file.data());
-	RUN_ABC;
+      if (_abc_api) {
+	a_api = (AbcApi *) _abc_api;
       }
-    
-      snprintf (cmdbuf, 1024, "strash; ifraig; dc2; strash; &get -n; &dch -f; &nf; &put; upsize; dnsize; write_verilog %s", mapped_file.data());
-      RUN_ABC;
-    
-      Abc_Stop();
-#endif
+      else {
+	a_api = new AbcApi ();
+	_abc_api = a_api;
+      }
+      if (!a_api->startSession (expr_set_name)) {
+	fatal_error ("Unable to start ABC session!");
+      }
+
+      if (!a_api->stdSynthesis ()) {
+	fatal_error ("Unable to run logic synthesis using ABC api");
+      }
+      
+      if (!a_api->endSession ()) {
+	fatal_error ("Unable to end session with ABC");
+      }
     }
     break;
     
@@ -580,8 +562,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
       sprintf(cmd,"rm %s && rm %s && rm %s.* && rm %s.* && rm -r fv* && rm -r rtl_fv* && rm %s && rm genus.*", mapped_file.data(), verilog_file.data(), mapped_file.data(), verilog_file.data(), lec_out.data());
       break;
     case synopsis:
-    case yosys:
     case abc:
+    case yosys:
     default:
       sprintf(cmd,"rm %s && rm %s && rm %s && rm %s.* ", mapped_file.data(), verilog_file.data(),
 	      sdc_file.data(), mapped_file.data());

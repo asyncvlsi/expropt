@@ -23,7 +23,6 @@ LIB=libexpropt_$(EXT).a
 SHLIB=libexpropt_sh_$(EXT).so
 
 include config.mk
-include ../abc/readline.mk
 
 TARGETLIBS=$(LIB) $(SHLIB)
 
@@ -33,7 +32,7 @@ TARGETINCSUBDIR=act
 
 TARGETCONF=expropt.conf
 
-OBJS2=expropt.o
+OBJS2=expropt.o abc_api.o
 
 OBJS= $(OBJS2)
 
@@ -45,6 +44,12 @@ endif
 
 ifdef FOUND_READLINE
 RLIBS=$(READLINELIB) -lreadline
+else
+RLIBS=
+endif
+
+ifdef abc_LIBDIR
+RLIBS := $(abc_LIBDIR) -labc $(RLIBS)
 else
 RLIBS=
 endif
@@ -62,7 +67,7 @@ $(LIB): $(OBJS)
 	$(RANLIB) $(LIB)
 
 $(SHLIB): $(SHOBJS) 
-	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB) -labc $(RLIBS)
+	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(EXPRCOMLIB) $(RLIBS)
 
 SUBDIRS=example
 

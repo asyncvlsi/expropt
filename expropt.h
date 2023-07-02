@@ -298,7 +298,8 @@ public:
                             cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
                             expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
                           }
-                          cleanup = config_get_int("expropt.clean_tmp_files"); 
+                          cleanup = config_get_int("expropt.clean_tmp_files");
+			  _abc_api = NULL;
                       }
     ~ExternalExprOpt();
 
@@ -422,6 +423,11 @@ private:
      */
     std::unordered_map<std::string, int> _varwidths;
     int _get_bitwidth (Expr *e);
+
+    /**
+     * This is a boxed pointer to the abc API
+     */
+    void *_abc_api;
 
 };
 #endif

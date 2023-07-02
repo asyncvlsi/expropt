@@ -1,3 +1,8 @@
 #!/bin/sh
 
 $ACT_HOME/scripts/tconfig
+
+if [ -f $ACT_HOME/scripts/found_readline ]
+then
+	cat $ACT_HOME/scripts/found_readline >> config.mk
+fi
