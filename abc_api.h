@@ -46,6 +46,7 @@ public:
   int startSession (const char *name);
   int runCmd (const char *cmd);
   int stdSynthesis ();
+  int runTiming ();
   int endSession ();
 
  private:

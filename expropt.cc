@@ -266,12 +266,13 @@ static struct cell_info {
 	  { "XOR2X1", 56, 0 }
 };
 
-static double parse_abc_info (const char *file, double *area)
+static double parse_abc_info (bool yosys_mode, const char *file, double *area)
 {
   char buf[10240];
   FILE *fp;
   double ret;
   int i;
+
 
   snprintf (buf, 10240, "%s.log", file);
   fp = fopen (buf, "r");
@@ -285,7 +286,7 @@ static double parse_abc_info (const char *file, double *area)
   }
 
   while (fgets (buf, 10240, fp)) {
-    if (strncmp (buf, "ABC:", 4) == 0) {
+    if (yosys_mode == false || (strncmp (buf, "ABC:", 4) == 0)) {
       char *tmp = strstr (buf, "Delay =");
       if (tmp) {
 	if (sscanf (tmp, "Delay = %lf ps", &ret) == 1) {
@@ -450,7 +451,14 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
       if (!a_api->stdSynthesis ()) {
 	fatal_error ("Unable to run logic synthesis using ABC api");
       }
-      
+
+      if (config_exists ("expropt.abc_use_constraints")) {
+	if (config_get_int ("expropt.abc_use_constraints") == 1) {
+	  if (!a_api->runTiming()) {
+	    fatal_error ("Unable to run timing");
+	  }
+	}
+      }
       if (!a_api->endSession ()) {
 	fatal_error ("Unable to end session with ABC");
       }
@@ -547,7 +555,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name, lis
   default:
     { double delay, area;
       area = 0.0;
-      delay = parse_abc_info (mapped_file.data(), &area);
+      delay = parse_abc_info (mapper == yosys ? true : false,
+			      mapped_file.data(), &area);
       info =  new ExprBlockInfo(delay,
 			      0, 0, 0, 0, 0, 0, 0, 0, area);
     }

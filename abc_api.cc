@@ -283,7 +283,7 @@ bool AbcApi::_startsession(char *name)
   }
   
   if (constr) {
-    snprintf (buf, 1024, "read constr %s%s.sdc", VERILOG_FILE_PREFIX, _name);
+    snprintf (buf, 1024, "read_constr %s%s.sdc", VERILOG_FILE_PREFIX, _name);
     if (!_run_abc (buf)) return false;
   }
 
@@ -375,6 +375,17 @@ int AbcApi::stdSynthesis ()
   }
 
   if (!runCmd ("strash; ifraig; dc2; strash; &get -n; &dch -f; &nf; &put; upsize; dnsize")) {
+    return 0;
+  }
+
+  return 1;
+}
+
+int AbcApi::runTiming ()
+{
+  Assert (_parent, "What?");
+
+  if (!runCmd ("stime -p")) {
     return 0;
   }
 
