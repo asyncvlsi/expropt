@@ -585,11 +585,13 @@ bool AbcApi::_endsession()
   }
   fprintf (vfp, ");\n");
 
+  int vectorize = (config_get_int("expropt.vectorize_all_ports") == 0) ? 0 : 1;
+
   for (listitem_t *li = list_first (iports); li; li = list_next (li)) {
     char *v = (char *) list_value (li);
     fprintf (vfp, "  input ");
     li = list_next (li);
-    if (list_ivalue (li) > 1) {
+    if (list_ivalue (li) > (1-vectorize)) {
       fprintf (vfp, "[%d:0] ", list_ivalue (li) - 1);
     }
     fprintf (vfp, "%s;\n", v);
@@ -599,7 +601,7 @@ bool AbcApi::_endsession()
     char *v = (char *) list_value (li);
     fprintf (vfp, "  output ");
     li = list_next (li);
-    if (list_ivalue (li) > 1) {
+    if (list_ivalue (li) > (1-vectorize)) {
       fprintf (vfp, "[%d:0] ", list_ivalue (li) - 1);
     }
     fprintf (vfp, "%s;\n", v);
@@ -617,7 +619,7 @@ bool AbcApi::_endsession()
     dim = list_ivalue (li);
       
     
-    if (dim < 2) {
+    if (dim < (2-vectorize)) {
       if (comma) { fprintf (vfp, ", "); }
       comma = 1;
       fprintf (vfp, "%s", v);
@@ -638,7 +640,7 @@ bool AbcApi::_endsession()
     li = list_next (li);
     dim = list_ivalue (li);
       
-    if (dim < 2) {
+    if (dim < (2-vectorize)) {
       if (comma) { fprintf (vfp, ", "); }
       comma = 1;
       fprintf (vfp, "%s", v);

@@ -271,6 +271,7 @@ public:
                       { 
                           
                           config_set_default_int ("expropt.clean_tmp_files", 1);
+                          config_set_default_int ("expropt.vectorize_all_ports", 0);
                           config_set_default_int ("expropt.verbose", 1);
                           config_set_default_string ("expropt.act_cell_lib_qdi_namespace", "syn");
                           config_set_default_string ("expropt.act_cell_lib_qdi_wire_type", "sdtexprchan<1>");

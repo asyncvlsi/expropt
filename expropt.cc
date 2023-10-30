@@ -687,6 +687,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   }
   fprintf(output_stream, " );\n");
 
+  int vectorize = (config_get_int("expropt.vectorize_all_ports") == 0) ? 0 : 1;
+
   _varwidths.clear();
   // print input ports with bitwidth
   fprintf(output_stream, "\n\t// print input ports with bitwidth\n");
@@ -708,7 +710,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     // look up the bitwidth
     int width = ihash_lookup(inwidthmap, (long) list_value (li))->i;
     if ( width <=0 ) fatal_error("ExternalExprOpt::print_expr_verilog error: Expression operands have incompatible bit widths\n");
-    else if (width == 1) fprintf(output_stream, "\tinput %s ;\n", current.data());
+    else if (width == 1 && vectorize==0) fprintf(output_stream, "\tinput %s ;\n", current.data());
     else fprintf(output_stream, "\tinput [%i:0] %s ;\n", width-1, current.data());
     _varwidths[current] = width;
   }
@@ -736,7 +738,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     // look up the bitwidth
     int width = ihash_lookup(outwidthmap, (long) list_value (li))->i;
     if ( width <=0 ) fatal_error("chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
-    else if (width == 1) fprintf(output_stream, "\toutput %s ;\n", current.data());
+    else if (width == 1 && vectorize==0) fprintf(output_stream, "\toutput %s ;\n", current.data());
     else fprintf(output_stream, "\toutput [%i:0] %s ;\n", width-1, current.data());
     _varwidths[current] = width;
   }
@@ -766,7 +768,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       // the bitwidth
       int width = ihash_lookup(outwidthmap, (long) list_value (li))->i;
       if ( width <=0 ) fatal_error("chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
-      else if (width == 1) fprintf(output_stream, "\twire %s ;\n", current.data());
+      else if (width == 1 && vectorize==0) fprintf(output_stream, "\twire %s ;\n", current.data());
       else fprintf(output_stream, "\twire [%i:0] %s ;\n", width-1, current.data());
       list_append (all_names, current.data());
       _varwidths[current] = width;
