@@ -687,7 +687,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   }
   fprintf(output_stream, " );\n");
 
-  int vectorize = config_get_int("expropt.vectorize_all_ports");
+  int vectorize = (config_get_int("expropt.vectorize_all_ports") == 0) ? 0 : 1;
 
   _varwidths.clear();
   // print input ports with bitwidth
