@@ -627,6 +627,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   char dummy_char;
   
   list_t *all_names = list_new ();
+
+  _Hexpr = phash_new (8);
   
 
   if (!output_stream) fatal_error("ExternalExprOpt::print_expr_verilog: verilog file is not writable");
@@ -835,7 +837,9 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     fprintf(output_stream,"\tassign %s = %s;\n", current.data(), buf);
     li_name = list_next(li_name);
   }
-  fprintf(output_stream, "\nendmodule\n");  
+  fprintf(output_stream, "\nendmodule\n");
+
+  phash_free (_Hexpr);
 }
 
 /*
@@ -861,6 +865,13 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   int lidx, ridx;
   int res, resw;
   char buf[100];
+
+  phash_bucket_t *b;
+
+  b = phash_lookup (_Hexpr, e);
+  if (b) {
+    return b->i;
+  }
 
 #define DUMP_DECL_ASSIGN						\
   do {									\
@@ -1241,6 +1252,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
       break;
   }
   fprintf (output_stream, ";\n");
+  b = phash_add (_Hexpr, e);
+  b->i = res;
   return res;
 }
 

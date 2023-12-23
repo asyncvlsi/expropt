@@ -418,6 +418,8 @@ private:
     }
     int _gen_fresh_idx () { return _dummy_idx++; }
 
+    struct pHashtable *_Hexpr;
+
     /**
      * This must be an E_VAR
      */
