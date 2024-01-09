@@ -904,7 +904,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
     /* rhs */
     _gen_dummy_id (buf, 100, lidx);
-    fprintf (output_stream, "%s == 0 ? 1'b0 : 1'b1", buf);
+    fprintf (output_stream, "%s ? 1'b1 : 1'b0", buf);
     break;
 
   case E_BUILTIN_INT:
@@ -1111,7 +1111,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	  bi->bitPrint (output_stream);
 	}
 	else {
-	  fprintf(output_stream, "%d'd%lu", resw, e->u.ival.v);
+	  fprintf(output_stream, "%d'h%lx", resw, e->u.ival.v);
 	}
       }
     }
