@@ -629,6 +629,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   list_t *all_names = list_new ();
 
   _Hexpr = phash_new (8);
+  _Hwidth = phash_new (8);
   
 
   if (!output_stream) fatal_error("ExternalExprOpt::print_expr_verilog: verilog file is not writable");
@@ -842,6 +843,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   fprintf(output_stream, "\nendmodule\n");
 
   phash_free (_Hexpr);
+  phash_free (_Hwidth);
 }
 
 /*
@@ -872,6 +874,12 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
   b = phash_lookup (_Hexpr, e);
   if (b) {
+    phash_bucket_t *b2;
+    // we need to set the bitwidth!
+    if (width) {
+      b2 = phash_lookup (_Hwidth, e);
+      *width = b2->i;
+    }
     return b->i;
   }
 
@@ -1256,6 +1264,10 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   fprintf (output_stream, ";\n");
   b = phash_add (_Hexpr, e);
   b->i = res;
+  if (width) {
+    b = phash_add (_Hwidth, e);
+    b->i = *width;
+  }
   return res;
 }
 

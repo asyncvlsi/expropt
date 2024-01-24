@@ -420,6 +420,7 @@ private:
     int _gen_fresh_idx () { return _dummy_idx++; }
 
     struct pHashtable *_Hexpr;
+    struct pHashtable *_Hwidth;
 
     /**
      * This must be an E_VAR
