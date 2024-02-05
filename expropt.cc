@@ -869,6 +869,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   int lidx, ridx;
   int res, resw;
   char buf[100];
+  Expr *orig_e = e;
 
   phash_bucket_t *b;
 
@@ -1262,10 +1263,10 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
       break;
   }
   fprintf (output_stream, ";\n");
-  b = phash_add (_Hexpr, e);
+  b = phash_add (_Hexpr, orig_e);
   b->i = res;
   if (width) {
-    b = phash_add (_Hwidth, e);
+    b = phash_add (_Hwidth, orig_e);
     b->i = *width;
   }
   return res;
