@@ -903,6 +903,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   lw = -1;
   rw = -1;
 
+  int vw = -1;
+  
   switch (e->type) {
   case E_BUILTIN_BOOL:
     lidx = print_expression(output_stream, e->u.e.l, exprmap);
@@ -1215,6 +1217,22 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
          l = (unsigned long) e->u.e.r->u.e.r->u.ival.v;
          r = l;
       }
+      {
+	ihash_bucket_t *b;
+	std::string tmp;
+	b = ihash_lookup (exprmap, (long)(e));
+	Assert (b, "variable not found in variable map");
+	tmp = (char *)b->v;
+	if (_varwidths.find (tmp) != _varwidths.end()) {
+	  vw = _varwidths[tmp];
+	  if (l >= _varwidths[tmp]) {
+	    l = _varwidths[tmp]-1;
+	  }
+	}
+	else {
+	  fatal_error ("Could not find bitwidth for variable %s!\n", (char *)b->v);
+	}
+      }
       resw = l - r + 1;
       DUMP_DECL_ASSIGN;
       {
@@ -1223,14 +1241,20 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	Assert (b, "variable not found in variable map");
 	fprintf(output_stream, "%s", (char *)b->v);
       }
-      fprintf(output_stream, " [");
-      if (l!=r) {
-        fprintf(output_stream, "%i:", l);
-        fprintf(output_stream, "%i", r);
-      } else {
-        fprintf(output_stream, "%i", r);
+      if (l == vw-1 && r == 0) {
+	// do nothing!
       }
-      fprintf(output_stream, "]");
+      else {
+	fprintf(output_stream, " [");
+	if (l!=r) {
+	  fprintf(output_stream, "%i:", l);
+	  fprintf(output_stream, "%i", r);
+	} else {
+	  fprintf(output_stream, "%i", r);
+	}
+	fprintf(output_stream, "]");
+	fprintf (output_stream, " // vw=%d, l=%d, r=%d", vw, l, r);
+      }
       break;
 
     case (E_REAL):
