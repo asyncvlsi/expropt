@@ -1253,7 +1253,6 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	  fprintf(output_stream, "%i", r);
 	}
 	fprintf(output_stream, "]");
-	fprintf (output_stream, " // vw=%d, l=%d, r=%d", vw, l, r);
       }
       break;
 
