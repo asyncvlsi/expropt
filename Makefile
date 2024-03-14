@@ -42,12 +42,8 @@ else
 EXPRCOMLIB=
 endif
 
-ifdef abc_LIBDIR
-RLIBS := $(abc_LIBDIR) -labc
-RLIBS_SO := $(abc_LIBDIR) $(ACT_HOME)/lib/libabc.so
-else
-RLIBS=
-endif
+RLIBS := -labc
+RLIBS_SO := $(ACT_HOME)/lib/libabc.so
 
 SHOBJS=$(OBJS:.o=.os)
 

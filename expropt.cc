@@ -27,10 +27,6 @@
 #include <act/exproptcommercial.h>
 #endif
 
-#ifndef FOUND_abc
-#error "Please use cmake to install the abc package from https://github.com/asyncvlsi/abc"
-#endif
-
 #include <act/types.h>
 #include <common/int.h>
 #include <string.h>
