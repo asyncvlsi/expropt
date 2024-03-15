@@ -244,13 +244,42 @@ bool AbcApi::_run_abc (char *cmd)
   return true;
 }
 
-bool AbcApi::_startsession(char *name)
+bool AbcApi::_startsession(char *args)
 {
   char buf[1024];
   Assert (_parent == false, "What?");
+
+
+  char *name = args;
+  int argpos = 0;
   
-  snprintf (buf, 1024, "%s%s%s.v.log", VERILOG_FILE_PREFIX, name,
-	    MAPPED_FILE_SUFFIX);
+  while (name[argpos] && name[argpos] != ' ') {
+    argpos++;
+  }
+  if (argpos == 0) {
+    return false;
+  }
+  name[argpos] = '\0';
+  
+  _name = Strdup (name);
+  
+  name = name + argpos + 1;
+  argpos = 0;
+  while (name[argpos] && name[argpos] != ' ') {
+    argpos++;
+  }
+  if (argpos == 0) {
+    return false;
+  }
+  name[argpos] = '\0';
+
+  _vin = Strdup (name);
+  name = name + argpos + 1;
+  argpos = 0;
+
+  _vout = Strdup (name);
+      
+  snprintf (buf, 1024, "%s.log", _vout);
   _logfd = open (buf, O_CREAT|O_TRUNC|O_RDWR, S_IRUSR|S_IWUSR);
 
   if (_logfd < 0) {
@@ -259,16 +288,14 @@ bool AbcApi::_startsession(char *name)
 
   dup2 (_logfd, 1);
   dup2 (_logfd, 2);
-
-  _name = Strdup (name);
+  
   
   Abc_Start ();
   
   _pAbc = Abc_FrameGetGlobalFrame ();
   
   // read Verilog, blast it, and read in the liberty file
-  snprintf (buf, 1024, "%%read %s%s.v; %%blast; &put",
-	    VERILOG_FILE_PREFIX, name);
+  snprintf (buf, 1024, "%%read %s; %%blast; &put", _vin);
   if (!_run_abc (buf)) return false;
 
   char *lib = config_get_string("expropt.liberty_tt_typtemp");
@@ -283,7 +310,15 @@ bool AbcApi::_startsession(char *name)
   }
   
   if (constr) {
-    snprintf (buf, 1024, "read_constr %s%s.sdc", VERILOG_FILE_PREFIX, _name);
+    int len;
+    name = Strdup (_vin);
+    len = strlen (name);
+    if (len > 1) {
+      name[len-1] = '\0';
+      name[len-2] = '\0';
+    }
+    snprintf (buf, 1024, "read_constr %s.sdc", name);
+    FREE (name);
     if (!_run_abc (buf)) return false;
   }
 
@@ -339,7 +374,7 @@ int AbcApi::_check_ok ()
   }
 }
 
-int AbcApi::startSession (const char *name)
+int AbcApi::startSession (const char *v_in, const char *v_out, const char *name)
 {
   Assert (_parent,"What?");
 
@@ -347,6 +382,18 @@ int AbcApi::startSession (const char *name)
     return 0;
   }
   if (write (_fd.to, name, strlen (name)) < 0) {
+    return 0;
+  }
+  if (write (_fd.to, " ", 1) < 0) {
+    return 0;
+  }
+  if (write (_fd.to, v_in, strlen (v_in)) < 0) {
+    return 0;
+  }
+  if (write (_fd.to, " ", 1) < 0) {
+    return 0;
+  }
+  if (write (_fd.to, v_out, strlen (v_out)) < 0) {
     return 0;
   }
   if (write (_fd.to, "$", 1) < 0) {
@@ -508,20 +555,20 @@ bool AbcApi::_endsession()
     return true;
   }
 
-  snprintf (buf, 1024, "write_verilog %s%s%s.v", VERILOG_FILE_PREFIX,
-	    _name, MAPPED_FILE_SUFFIX);
+  snprintf (buf, 1024, "write_verilog %s", _vout);
   _run_abc (buf);
-
   fflush (stdout);
   fflush (stderr);
   write (_logfd, "\n", 1);
   
   snprintf (buf, 1024, "print_io; print_gates");
   _run_abc (buf);
+  fflush (stdout);
+  fflush (stderr);
 
   FILE *fp;
   FILE *vfp;
-  snprintf (buf, 1024, "%s%s%s.v.log", VERILOG_FILE_PREFIX, _name, MAPPED_FILE_SUFFIX);
+  snprintf (buf, 1024, "%s.log", _vout);
   if (!(fp = fopen (buf, "r"))) {
     return false;
   }
@@ -561,7 +608,7 @@ bool AbcApi::_endsession()
   }
   fclose (fp);
 
-  snprintf (buf, 1024, "%s%s%s.v", VERILOG_FILE_PREFIX, _name, MAPPED_FILE_SUFFIX);
+  snprintf (buf, 1024, "%s", _vout);
   vfp = fopen (buf, "a");
   fprintf (vfp, "module %s (", _name);
 
@@ -663,6 +710,8 @@ bool AbcApi::_endsession()
   fclose (vfp);
   
   FREE (_name);
+  FREE (_vin);
+  FREE (_vout);
   fflush (stdout);
   fflush (stderr);
   close (_logfd);

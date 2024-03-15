@@ -30,7 +30,7 @@ SRCS=$(OBJS:.o=.cc)
 include $(VLSI_TOOLS_SRC)/scripts/Makefile.std
 
 $(BINARY): $(LIB) $(OBJS) $(ACTDEPEND)
-	$(CXX) $(CFLAGS) $(OBJS) -o $(BINARY) $(LIBACTPASS) -lexpropt
+	$(CXX) $(CFLAGS) $(OBJS) -o $(BINARY) $(LIBACTPASS) -lexpropt -labc
 
 
 debug: obj_chpexpr2verilog

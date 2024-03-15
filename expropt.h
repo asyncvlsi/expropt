@@ -18,7 +18,6 @@
  *  Boston, MA  02110-1301, USA.
  *
  **************************************************************************/
-
 #ifndef __EXPR_OPT_H__
 #define __EXPR_OPT_H__
 
@@ -29,137 +28,118 @@
 #include <unordered_map>
 
 /**
- * enum for referencing the mapper software type, to define which external syntesis tool to use for syntesis
- */
-enum expr_mapping_software {
-        abc = 0,
-        yosys = 1,
-        synopsis = 2,
-        genus = 3
-    };
-
-/**
  * enum for referencing the pass type
  */
 enum expr_mapping_target {
         qdi = 0,
         bd = 1,
-    };
+};
 
 /**
  * the metadata object holds all extracted points of the expr set.
  */
-class ExprBlockInfo
-{
-private:
-    /* data */
-public:
-    /**
-     * the typical delay corner as normal temp, in seconds.
-     * 0 if not extracted.
-     */
-    const double delay_typ;
 
-    /**
-     * the max delay corner as normal high and slow slow corner, in seconds.
-     * 0 if not extracted.
-     */
-    const double delay_max;
+struct metric_triplet {
+  metric_triplet() {
+    typ_val = 0;
+    min_val = 0;
+    max_val = 0;
+    found = false;
+  }
+  
+  /* Metrics typically have a range: typical value, min value, and max
+     value.
+  */
+  double typ_val, min_val, max_val;
+  bool found;
+  
+  bool exists() { return found; }
 
-    /**
-     * the min delay corner as low temp and fast fast corner, in seconds.
-     * 0 if not extracted.
-     */
-    const double delay_min;
-
-    /**
-     * the typical power corner at normal temp, in A?.
-     * 0 if not extracted.
-     */
-    const double power_typ;
-
-    /**
-     * the typical power corner at normal temp, in A?.
-     * 0 if not extracted.
-     */
-    const double power_typ_static;
-
-    /**
-     * the typical power corner at normal temp, in A?.
-     * 0 if not extracted.
-     */
-    const double power_typ_dynamic;
-
-    /**
-     * the high power corner at high temp and fast fast corner, in A?.
-     * 0 if not extracted.
-     */
-    const double power_max;
-
-    /**
-     * the typical power corner at normal temp, in A?.
-     * 0 if not extracted.
-     */
-    const double power_max_static;
-
-    /**
-     * the typical power corner at normal temp, in A?.
-     * 0 if not extracted.
-     */
-    const double power_max_dynamic;
-
-
-    /**
-     * the theoretical area of all gates combined, with 100% utiliasation.
-     * 0 if not extracted.
-     */
-    const double area;
-
-    /**
-     * Construct a new Expr Block Info object, values can not be changed after creation.
-     * 
-     * parameter see getter descriptions.
-     */
-    ExprBlockInfo( 
-                    const double e_delay_typ,
-                    const double e_delay_min,
-                    const double e_delay_max,
-                    const double e_power_typ,
-                    const double e_power_max,
-                    const double e_area,
-                    const double e_power_typ_static = 0,
-                    const double e_power_typ_dynamic = 0,
-                    const double e_power_max_static = 0,
-                    const double e_power_max_dynamic = 0) : 
-                    delay_typ(e_delay_typ),
-                    delay_max(e_delay_max),
-                    delay_min(e_delay_min),
-                    power_typ(e_power_typ),
-                    power_typ_static(e_power_typ_static),
-                    power_typ_dynamic(e_power_typ_dynamic),
-                    power_max(e_power_max),
-                    power_max_static(e_power_max_static),
-                    power_max_dynamic(e_power_max_dynamic),
-                    area(e_area) { }
-    
-    /**
-     * Construct a new Expr Block dummy with no extration results =>
-     * all 0, but delay_typ = -1 to indicate that the results were not
-     * created.
-     */
-    ExprBlockInfo( ) : 
-                    delay_typ(-1),
-                    delay_max(0),
-                    delay_min(0),
-                    power_typ(0),
-                    power_typ_static(0),
-                    power_typ_dynamic(0),
-                    power_max(0),
-                    power_max_static(0),
-                    power_max_dynamic(0),
-                    area(0){ }
-    ~ExprBlockInfo() { }
+  void set_typ_only(double v) {
+    min_val = v;
+    typ_val = v;
+    max_val = v;
+    found = true;
+  }
+  void set_metrics(double v_min, double v_typ, double v_max) {
+    min_val = v_min;
+    typ_val = v_typ;
+    max_val = v_max;
+    found = true;
+  }
 };
+
+enum expropt_metadata {
+  metadata_area = 0,
+  metadata_delay_typ = 1,
+  metadata_power_typ = 2,
+  metadata_delay_max = 3,
+  metadata_delay_min = 4,
+  metadata_power_typ_static = 5,
+  metadata_power_typ_dynamic = 6,
+  metadata_power_max = 7,
+  metadata_power_max_static = 8,
+  metadata_power_max_dynamic = 9
+};
+
+struct act_syn_info {
+  const char *v_in;
+  const char *v_out;
+  const char *toplevel;
+  bool use_tie_cells;
+  void *space;			// use for whatever you want!
+};
+
+class ExprBlockInfo {
+private:
+  metric_triplet delay;		//< delay value (s)
+  metric_triplet static_power;	//< power value (W)
+  metric_triplet dynamic_power; //<  power value (W)
+  metric_triplet total_power;	//<  total power (W)
+
+  /**
+   * the theoretical area of all gates combined, with 100% utiliasation.
+   * 0 if not extracted.
+   */
+  double area;
+
+public:
+
+  metric_triplet getDelay() { return delay; }
+  metric_triplet getStaticPower() { return static_power; }
+  metric_triplet getDynamicPower() { return dynamic_power; }
+  metric_triplet getPower() { return total_power; }
+  double getArea() { return area; }
+
+  /**
+   * Construct a new Expr Block Info object, values can not be changed after creation.
+   * 
+   * parameter see getter descriptions.
+   */
+  ExprBlockInfo(const metric_triplet e_delay,
+		const metric_triplet e_power,
+		const metric_triplet e_static_power,
+		const metric_triplet e_dynamic_power,
+		const double e_area) :
+    delay{e_delay},
+    total_power{e_power},
+    static_power{e_static_power},
+    dynamic_power{e_dynamic_power},
+    area{e_area}
+  { }
+                    
+  /**
+   * Construct a new Expr Block dummy with no extration results =>
+   * all 0, but area = -1 to indicate that the results were not
+   * created.
+   */
+  ExprBlockInfo() : area{-1} { };
+  
+  ~ExprBlockInfo() { }
+
+  bool exists() { return area == -1 ? false : true; }
+};
+
 
 /**
  * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
@@ -169,155 +149,268 @@ public:
 class ExternalExprOpt
 {
 public:
-    /**
-     * INTEGER ID MODE - single expr
-     * run_external_opt will take one expression "e" and syntesise, optimise and map it to a gate library.
-     * 
-     * the resulting block will be appended to the output file, the block will be named with the block prefix and the given id "expr_set_number",
-     * the output will use "out". All the inputs are named with expr_prefix and there respective id given in the "in_expr_map".
-     * the width of the variables will be specified as the even elements in the input list, so first the ID and than the width.
-     * the output is using "out" and the width defined in target width.
-     * 
-     * @param expr_set_number the number for the block and the output.
-     * @param targetwidth number of the output width/number of wires
-     * @param e the expresion to be optimised and mapped
-     * @param in_expr_list an act list of expr leaf data structures/variables, they should be E_VAR and for bundled data additional E_INT, E_TRUE, E_FALSE, ...
-     * @param in_expr_map the map from pointer (as long int) of the expr struct to char* strings, if a mapping for eg. E_INT is defind it will take precidence over printing the value, E_VAR has to have a mapping.
-     * @param in_width_map the map from pointer (as long int) of the expr struct to int for how many wires the expression is referencing to, so the width of the specifig input bus.
-     */
-    ExprBlockInfo* run_external_opt (int expr_set_number, int targetwidth, Expr *e, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map);
-
-    /**
-     * INTEGER ID MODE - set of expr - do not use
-     * run_external_opt will take a list of expressions "expr_list" and syntesise, optimise and map it to a gate library.
-     * this list must belong to the same logic step, the optimisation will share gates.
-     * 
-     * the resulting block will be appended to the output file, the block will be named with the block prefix and the given id "expr_set_number",
-     * the outputs will use the expression prefix and the ids from the output list. 
-     * All the inputs are named with expr_prefix and there respective id given in the "exprmap"/in_list.
-     * the width of the variables will be specified as the even elements in the input and output lists, so first the ID and than the width.
-     * 
-     * @param expr_set_number  the number for the block, its appended the the block prefix.
-     * @param expr_list the set of expressions to be optimised
-     * @param in_list the list of input id with the width, first element id, second element width of previous id
-     * @param out_list the list of output id with the width, first element id, second element width of previous id, the order must be alinged with the expression list.
-     * @param exprmap the pointer of the expresion is the key the id is the value, this is to map the variables inside the expression to the corresponding IDs
-     */
-    ExprBlockInfo* run_external_opt (int expr_set_number, list_t *expr_list, list_t *in_list, list_t *out_list, iHashtable *exprmap);
-
-    /**
-     * C-STRING MODE - set of expr - recomended mode - outputs are unique
-     * run_external_opt will take a set of expressions and syntesise, optimise and map it to a gate library.
-     * 
-     * the resulting block will be appended to the output file, the block will be named with expr_set_name,
-     * In and out have to be seperate, because in the IN case you refference the expression variable/port itself and for the outputs the variable/port its assigned to and not itself.
-     * the optional hidden expression list works the same way, it will source the properties for its variables from in maps, and the assing to from the out maps.
-     * 
-     * @param expr_set_name the name of the verilog module
-     * @param in_expr_list an act list of expr leaf data structures/variables, they should be E_VAR and for bundled data additional E_INT, E_TRUE, E_FALSE, ...
-     * @param in_expr_map the map from pointer (as long int) of the expr struct to char* strings, if a mapping for eg. E_INT is defind it will take precidence over printing the value, E_VAR has to have a mapping.
-     * @param in_width_map the map from pointer (as long int) of the expr struct to int for how many wires the expression is referencing to, so the width of the specifig input bus.
-     * @param out_expr_list an act list for the full expression so the head of the data structure, that are outputs of to be mapped module. 
-     * @param out_expr_map the map from pointer (as long int) of the expr struct to char* strings, with the name the result of the expression is assinged to.
-     * @param out_width_map the map from pointer (as long int) of the expr struct to int, for the bus width of the output
-     * @param hidden_expr_list optional - like out_list just the assigns are not used on the outputs, they can be used leafs for the outputs again when using the same char* string name.
-     */
-    ExprBlockInfo* run_external_opt (const char* expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map, list_t *out_expr_list, iHashtable *out_expr_map, iHashtable *out_width_map, list_t *hidden_expr_list = NULL);
-
-
-    /**
-     * C-STRING MODE - set of expr - with copy on output for non unique outputs/hidden expressions
-     * run_external_opt will take a set of expressions and syntesise, optimise and map it to a gate library.
-     * 
-     * the resulting block will be appended to the output file, the block will be named with expr_set_name,
-     * In and out have to be seperate, because in the IN case you refference the expression variable/port itself and for the outputs the variable/port its assigned to and not itself.
-     * the optional hidden expression list works the same way, it will source the properties for its variables from in maps, and the assing to from the out maps.
-     * 
-     * @param expr_set_name the name of the verilog module
-     * @param in_expr_list an act list of expr leaf data structures/variables, they should be E_VAR and for bundled data additional E_INT, E_TRUE, E_FALSE, ...
-     * @param in_expr_map the map from pointer (as long int) of the expr struct to char* strings, if a mapping for eg. E_INT is defind it will take precidence over printing the value, E_VAR has to have a mapping.
-     * @param in_width_map the map from pointer (as long int) of the expr struct to int for how many wires the expression is referencing to, so the width of the specifig input bus.
-     * @param out_expr_list an act list for the full expression so the head of the data structure, that are outputs of to be mapped module. 
-     * @param out_expr_name_list an index aligned list (with regards to out_expr_list) with the name (C string pointer) the result of the expression is assinged to.
-     * @param out_width_map the map from pointer (as long int) of the expr struct to int, for the bus width of the output
-     * @param hidden_expr_list optional - like out_list just the assigns are not used on the outputs, they can be used leafs for the outputs again when using the same char* string name.
-     * @param hidden_expr_name_list an index aligned list (with regards to hidden_expr_list) with the name (C string pointer) the result of the expression is assinged to
-    */
-    ExprBlockInfo* run_external_opt (const char* expr_set_name, list_t *in_expr_list, iHashtable *in_expr_map, iHashtable *in_width_map, list_t *out_expr_list, list_t *out_expr_name_list, iHashtable *out_width_map, list_t *hidden_expr_list = NULL, list_t *hidden_expr_name_list = NULL);
-
-    /**
-     * Construct a new External Exp Opt generator, supply it with all the settings needed.
-     * most of the technology settings are loaded via the configuration file expropt.conf
-     * 
-     * @param datapath_syntesis_tool which tool to use, see expr_mapping_software
-     * @param mapping_target are we mapping for bundled data or qdi
-     * @param expr_file_path the output file path, this is the file all the optimised expression blocks will be saved to. if empty only metadata will be extracted.
-     * @param exprid_prefix optional - the prefix for all in and outputs  - if integer id mode is used
-     * @param block_prefix the prefix for the expression block - if integer id mode is used
-     */
-    ExternalExprOpt( const expr_mapping_software datapath_syntesis_tool,
-                    const expr_mapping_target mapping_target,
-                    const bool tie_cells,
-                    const std::string expr_file_path = "",
-                    const std::string exprid_prefix = "e",
-                    const std::string block_prefix = "blk") 
+  /**
+   * Construct a new ExternalExpOpt generator, supply it with all
+   * the settings needed.
+   *
+   * Most of the technology settings are loaded via the
+   * configuration file expropt.conf
+   * 
+   * @param datapath_syntesis_tool which tool to use; NULL = built-in abc
+   *
+   * @param mapping_target are we mapping for bundled data or qdi
+   *
+   * @param expr_file_path the output file path, this is the file
+   * all the optimised expression blocks will be saved to. if empty
+   * only metadata will be extracted.
+   *
+   * @param exprid_prefix optional - the prefix for all in and
+   * outputs  - if integer id mode is used
+   *
+   * @param block_prefix the prefix for the expression block - if
+   * integer id mode is used
+   */
+  ExternalExprOpt( const char *datapath_syntesis_tool,
+		   const expr_mapping_target mapping_target,
+		   const bool tie_cells,
+		   const std::string expr_file_path = "",
+		   const std::string exprid_prefix = "e",
+		   const std::string block_prefix = "blk") 
                     :
                         expr_output_file(expr_file_path),
-	                    expr_prefix(exprid_prefix),
-	                    module_prefix(block_prefix),
-						mapper(datapath_syntesis_tool),
-	                    use_tie_cells(tie_cells),
+			expr_prefix(exprid_prefix),
+			module_prefix(block_prefix),
+			mapper(datapath_syntesis_tool),
+			use_tie_cells(tie_cells),
                         wire_encoding(mapping_target)
-                      { 
-                          
-                          config_set_default_int ("expropt.clean_tmp_files", 1);
-                          config_set_default_int ("expropt.vectorize_all_ports", 0);
-                          config_set_default_int ("expropt.verbose", 1);
-                          config_set_default_string ("expropt.act_cell_lib_qdi_namespace", "syn");
-                          config_set_default_string ("expropt.act_cell_lib_qdi_wire_type", "sdtexprchan<1>");
-                          config_set_default_string ("expropt.act_cell_lib_bd_namespace", "syn");
-                          config_set_default_string ("expropt.act_cell_lib_bd_wire_type", "bool");
+  {
+    _init_defaults ();
 
-                          config_set_default_string ("expropt.captable", "none");
-                          config_set_default_string ("expropt.lef", "none");
-                          config_set_default_string ("expropt.liberty_ff_hightemp", "none");
-                          config_set_default_string ("expropt.liberty_ff_lowtemp", "none");
-                          config_set_default_string ("expropt.liberty_ss_hightemp", "none");
+    // The difference between QDI and BD is just that the cells are
+    // different.
+    if (wire_encoding == qdi) {
+      cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
+      cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
+      expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
+    }
+    else {
+      cell_act_file = config_get_string("expropt.act_cell_lib_bd");
+      cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
+      expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
+    }
+    
+    _cleanup = config_get_int("expropt.clean_tmp_files");
 
-			  config_set_default_real ("expropt.default_load", 1.0);
+    _abc_api = NULL;
+  }
 
-                          config_read("expropt.conf");
+  // cleanup and delete abc if it was started
+  ~ExternalExprOpt();
 
-                          if (wire_encoding == qdi){
-                            cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
-                            cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
-                            expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
-                          }
-                          else
-                          {
-                            cell_act_file = config_get_string("expropt.act_cell_lib_bd");
-                            cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
-                            expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
-                          }
-                          cleanup = config_get_int("expropt.clean_tmp_files");
-			  _abc_api = NULL;
-                      }
-    ~ExternalExprOpt();
+  /**
+   *  The common steps for the external expression optimizer are:
+   *
+   *    (a) Convert the ACT expression(s) into their equivalent
+   *    Verilog, respecting the different bit-width conventions of the
+   *    two languages. As the library is written as a standalone
+   *    component, bit-width information is passed into this library
+   *    through hash tables.
+   *
+   *    (b) Call a logic optimization tool on the Verilog design. This
+   *    can be abc (built-in), or any other external optimization tool
+   *    like yosys, Cadence genus, or Synopsys design compiler.
+   *
+   *    (c) Translate the synthesized and tech mapped design back into
+   *    an ACT design. This uses the v2act tool distributed in the core
+   *    ACT library.
+   *
+   *    (d) Append the generated ACT to a file
+   *
+   *  There are a number of ways to call the expression optimizer and
+   *  control the generated ACT. This impacts the process name used as
+   *  well as the names of the ports in the generated processes.
+   *
+   *
+   * 1. INTEGER ID MODE : used to optimize a single expression.
+   * (This is the mode used by chp2prs.)
+   * 
+   * The port list parameters are specified using an integer ID
+   * (provided by in_expr_map), and the prefix for the port is given by
+   * exprid_prefix (constructor).
+   * 
+   * The process name uses the block_prefix (constructor), and the
+   * integer suffix used is specified by the run_external_opt() call.
+   *
+   * 2. C-STRING MODE : the process name to be used is provided. Also,
+   * the names of the input ports and output ports are also
+   * provided. Hidden variables (internal shared nodes) can be
+   * specified as well.
+   *
+   */
+  
 
-    /**
-     * work in progress value extraction from genus logs, area is also possible in abc, @todo abc timing is not known if printable.
-     * 
-     * @param log_file_name the log file, acutally the base name the individual reports are speperate for each case
-     * @return ExprBlockInfo* the datastructure with the result data
-     */
-    ExprBlockInfo* parse_genus_log(std::string log_file_name);
+  /**
+   * INTEGER ID MODE - single expr run_external_opt will take one
+   * expression "e" and synthesize, optimise and map it to a gate
+   * library.
+   * 
+   * The resulting block will be appended to the output file, the
+   * block will be named with the block prefix and the given id
+   * "expr_set_number", the output will use "out". All the inputs
+   * are named with expr_prefix and there respective id given in the
+   * "in_expr_map".  the width of the variables will be specified as
+   * the even elements in the input list, so first the ID and than
+   * the width.  the output is using "out" and the width defined in
+   * target width.
+   *
+   * The implementation of this function converts the simplified
+   * arguments into a call to the simple C-STRING MODE version.
+   * 
+   * @param expr_set_number the number for the block and the output.
+   * @param targetwidth number of the output width/number of wires
+   * @param e the expresion to be optimised and mapped
+   * @param in_expr_list an act list of expr leaf data
+   * structures/variables, they should be E_VAR and for bundled data
+   * additional E_INT, E_TRUE, E_FALSE, ...
+   * @param in_expr_map the map from pointer (as long int) of the
+   * expr struct to char* strings, if a mapping for eg. E_INT is
+   * defind it will take precidence over printing the value, E_VAR
+   * has to have a mapping.
+   * @param in_width_map the map from pointer (as long int) of the
+   * expr struct to int for how many wires the expression is
+   * referencing to, so the width of the specifig input bus.
+   */
+  ExprBlockInfo* run_external_opt (int expr_set_number,
+				   int targetwidth,
+				   Expr *e,
+				   list_t *in_expr_list,
+				   iHashtable *in_expr_map,
+				   iHashtable *in_width_map);
+
+  /**
+   * Simple C-STRING MODE - set of expr - recomended mode - outputs are
+   * unique.
+   *
+   * run_external_opt() will take a set of expressions and syntesise,
+   * optimise and map it to a gate library.  The resulting process
+   * will be appended to the output file, the process will be named with
+   * expr_set_name.
+   *
+   * In and out have to be seperate, because in the IN case you
+   * reference the expression variable/port itself and for the
+   * outputs the variable/port its assigned to and not itself.  the
+   * optional hidden expression list works the same way, it will
+   * source the properties for its variables from in maps, and the
+   * assign to from the out maps.
+   * 
+   * @param expr_set_name the name of the verilog module
+   *
+   * @param in_expr_list an act list of expr leaf data
+   * structures/variables, they should be E_VAR and for bundled data
+   * additional E_INT, E_TRUE, E_FALSE, ...
+   * @param in_expr_map the map from pointer (as long int) of the expr
+   * struct to char* strings, if a mapping for eg. E_INT is defind it
+   * will take precidence over printing the value, E_VAR has to have a
+   * mapping.
+   * @param in_width_map the map from pointer (as long int) of the
+   * expr struct to int for how many wires the expression is
+   * referencing to, so the width of the specifig input bus.
+   * @param out_expr_list an act list for the full expression so the
+   * head of the data structure, that are outputs of to be mapped
+   * module.
+   * @param out_expr_map the map from pointer (as long int) of the
+   * expr struct to char* strings, with the name the result of the
+   * expression is assinged to.
+   * @param out_width_map the map from pointer (as long int) of the
+   * expr struct to int, for the bus width of the output
+   * @param hidden_expr_list optional - like out_list just the assigns
+   * are not used on the outputs, they can be used leafs for the
+   * outputs again when using the same char* string name.
+   */
+  ExprBlockInfo* run_external_opt (const char* expr_set_name,
+				   list_t *in_expr_list,
+				   iHashtable *in_expr_map,
+				   iHashtable *in_width_map,
+				   list_t *out_expr_list,
+				   iHashtable *out_expr_map,
+				   iHashtable *out_width_map,
+				   list_t *hidden_expr_list = NULL);
+
+  
+  /**
+   * General C-STRING MODE - set of expr - with copy on output for non
+   * unique outputs/hidden expressions.
+   *
+   * run_external_opt() will take a set of expressions and syntesise,
+   * optimise and map it to a gate library. The resulting block will
+   * be appended to the output file, the block will be named with
+   * expr_set_name,
+   *
+   * In and out have to be seperate, because in the IN case you
+   * refference the expression variable/port itself and for the
+   * outputs the variable/port its assigned to and not itself.
+   * the optional hidden expression list works the same way, it will
+   * source the properties for its variables from in maps, and the
+   * assing to from the out maps.
+   * 
+   * @param expr_set_name the name of the verilog module
+   * @param in_expr_list an act list of expr leaf data
+   * structures/variables, they should be E_VAR and for bundled data
+   * additional E_INT, E_TRUE, E_FALSE, ... 
+   * @param in_expr_map the map from pointer (as long int) of the expr
+   * struct to char* strings, if a mapping for eg. E_INT is defind it
+   * will take precidence over printing the value, E_VAR has to have a
+   * mapping. 
+   * @param in_width_map the map from pointer (as long int) of the
+   * expr struct to int for how many wires the expression is
+   * referencing to, so the width of the specifig input bus. 
+   * @param out_expr_list an act list for the full expression so the
+   * head of the data structure, that are outputs of to be mapped
+   * module.  
+   * @param out_expr_name_list an index aligned list (with regards to
+   * out_expr_list) with the name (C string pointer) the result of the
+   * expression is assinged to. 
+   * @param out_width_map the map from pointer (as long int) of the
+   * expr struct to int, for the bus width of the output 
+   * @param hidden_expr_list optional - like out_list just the assigns
+   * are not used on the outputs, they can be used leafs for the
+   * outputs again when using the same char* string name. 
+   * @param hidden_expr_name_list an index aligned list (with regards
+   * to hidden_expr_list) with the name (C string pointer) the result
+   * of the expression is assinged to
+   */
+  ExprBlockInfo* run_external_opt (const char* expr_set_name,
+				   list_t *in_expr_list,
+				   iHashtable *in_expr_map,
+				   iHashtable *in_width_map,
+				   list_t *out_expr_list,
+				   list_t *out_expr_name_list,
+				   iHashtable *out_width_map,
+				   list_t *hidden_expr_list = NULL,
+				   list_t *hidden_expr_name_list = NULL);
+
+
+
+  /**
+   * work in progress value extraction from genus logs, area is also
+   * possible in abc, @todo abc timing is not known if printable.
+   * 
+   * @param log_file_name the log file, acutally the base name the individual reports are speperate for each case
+   * @return ExprBlockInfo* the datastructure with the result data
+   */
+  ExprBlockInfo* parse_genus_log(std::string log_file_name);
 
 private:
 
-    bool cleanup;
-    /**
-     * print the verilog module, internal takes the inputs and outputs as lists of expressions (plus the properites name and width as maps). 
-     * In and out have to be seperate, because in the in case you mean the expression var itself and for the outputs what its assigned to.
+  void _init_defaults(); 	//< initialize default parameters for
+				//< configuration, and read expropt.conf
+				//< to override any of the defaults.
+
+  bool _cleanup;
+  
+  /**
+   * print the verilog module, internal takes the inputs and outputs as lists of expressions (plus the properites name and width as maps). 
+   * In and out have to be seperate, because in the in case you mean the expression var itself and for the outputs what its assigned to.
      * the optional hidden expression list works the same way, it will source the properties for its variables from in maps, and the assing to from the out maps.
      * 
      * @param output_stream the file its printed to, fatal error if file not open.
@@ -331,17 +424,17 @@ private:
      * @param expr_list optional - like out_list just the assigns are not used on the outputs, they can be used leafs for the outputs again when using the same char* string name.
      * @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of the expression is assinged to.
      */
-    void print_expr_verilog (FILE *output_stream, const char* expr_set_name, list_t *in_list,  iHashtable *inexprmap, iHashtable *inwidthmap, list_t *out_list, list_t *out_name_list, iHashtable *outwidthmap, list_t *expr_list = NULL, list_t *hidden_name_list = NULL);
+    void print_expr_verilog (FILE *output_stream,
+			     const char* expr_set_name,
+			     list_t *in_list,
+			     iHashtable *inexprmap,
+			     iHashtable *inwidthmap,
+			     list_t *out_list,
+			     list_t *out_name_list,
+			     iHashtable *outwidthmap,
+			     list_t *expr_list = NULL,
+			     list_t *hidden_name_list = NULL);
     
-    /**
-     * the generator for the genus run scripts.
-     * 
-     * @param tcl_file_name the file the genus instructions are written to
-     * @param file_name the file name of the input verilog.
-     * @param out_file_name the file for the mapped output file.
-     * @param process_name the name of the top level verilog module.
-     */
-    void generate_genus_tcl(const char *tcl_file_name, const char *file_name, const char *out_file_name, const char* process_name);
 
     /**
      * the recursive method to print the expression itself as the rhs of a verilog assign.
@@ -355,9 +448,6 @@ private:
   int print_expression(FILE *output_stream, Expr *e, iHashtable *exprmap,
 		       int *width = NULL);
 
-
-
-    double parse_and_return_max(std::string filename, std::string parse_format, double failure_value = 0 , bool fail_if_file_does_no_exist = false);
 
 
     /**
@@ -397,7 +487,7 @@ private:
     /**
      * the software to be used for syntesis and mapping.
      */
-    const expr_mapping_software mapper;
+    const char *mapper;
 
     /**
      * should tie cells be incerted by the syntesis software (true), or should v2act take cae of it (false)
@@ -433,7 +523,11 @@ private:
      */
     void *_abc_api;
 
+    bool (*_syn_run) (act_syn_info *s);
+    double (*_syn_get_metric) (act_syn_info *s, expropt_metadata type);
+    void (*_syn_cleanup) (act_syn_info *s);
+    void *_syn_dlib;
 };
-#endif
 
 
+#endif /* __EXPR_OPT_H__ */

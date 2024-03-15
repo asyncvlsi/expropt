@@ -35,15 +35,18 @@ extern "C" {
 
 }
 
-#define VERILOG_FILE_PREFIX "exprop_"
-#define MAPPED_FILE_SUFFIX "_mapped"
-
 class AbcApi {
 public:
   AbcApi ();
   ~AbcApi ();
 
-  int startSession (const char *name);
+  /*
+   * @param v_in is the input Verilog file
+   * @param v_out is where the mapped Verilog netlist should be saved
+   * @param name is the name of the top-level module
+   */
+  int startSession (const char *v_in, const char *v_out, const char *name);
+  
   int runCmd (const char *cmd);
   int stdSynthesis ();
   int runTiming ();
@@ -51,6 +54,9 @@ public:
 
  private:
   char *_name;			// name of the module
+  char *_vin;			// Verilog input file
+  char *_vout;			// Verilog output file
+  
   bool _parent;
   int _childpid;
   Abc_Frame_t *_pAbc;

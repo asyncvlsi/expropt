@@ -81,7 +81,7 @@ void chpexprexample::start_new_set ()
   info = optimiser->run_external_opt(expr_set_name, in_expr_bundle, inexprmap, inwidthmap, out_expr_bundle, outexprmap, outwidthmap);
 
   printf("Generated block %s: Area: %e m2, Power: %e W, delay: %e s, max power: %e, min delay: %e, max delay: %e, static power: %e, dynamic power: %e (if 0 => circuit empty, extraction failed or corner not provided)\n", 
-      expr_set_name, info->area, info->power_typ, info->delay_typ, info->power_max, info->delay_min, info->delay_max, info->power_typ_static, info->power_typ_dynamic);
+      expr_set_name, info->getArea(), info->getPower().typ_val, info->getDelay().typ_val, info->getPower().max_val, info->getDelay().min_val, info->getDelay().max_val, info->getStaticPower().typ_val, info->getDynamicPower().typ_val);
 
   // keep track and clean up, create freh set
   expr_set_number++;
