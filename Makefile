@@ -22,12 +22,9 @@
 LIB=libexpropt_$(EXT).a
 SHLIB=libexpropt_sh_$(EXT).so
 
-include config.mk
-
 TARGETLIBS=$(LIB) $(SHLIB) \
 	act_extsyn_yosys.so \
-	act_extsyn_abc.so \
-	act_extsyn_genus.so
+	act_extsyn_abc.so
 
 TARGETINCS=expropt.h
 
@@ -38,12 +35,6 @@ TARGETCONF=expropt.conf
 OBJS2=expropt.o verilog.o abc_api.o
 
 OBJS= $(OBJS2)
-
-ifdef exproptcommercial_INCLUDE
-EXPRCOMLIB=-lexproptcommercial_sh
-else
-EXPRCOMLIB=
-endif
 
 RLIBS := -labc
 RLIBS_SO := $(ACT_HOME)/lib/libabc.so
@@ -65,9 +56,6 @@ $(SHLIB): $(SHOBJS)
 
 act_extsyn_yosys.so: yosys.os
 	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os $(SHLIBACT)
-
-act_extsyn_genus.so: genus.os
-	$(ACT_HOME)/scripts/linkso act_extsyn_genus.so genus.os $(SHLIBACT) $(EXPRCOMLIB)
 
 act_extsyn_abc.so: abc.os abc_api.os
 	$(ACT_HOME)/scripts/linkso act_extsyn_abc.so abc.os abc_api.os $(SHLIBACT) $(RLIBS_SO)

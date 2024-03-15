@@ -390,16 +390,6 @@ public:
 				   list_t *hidden_expr_name_list = NULL);
 
 
-
-  /**
-   * work in progress value extraction from genus logs, area is also
-   * possible in abc, @todo abc timing is not known if printable.
-   * 
-   * @param log_file_name the log file, acutally the base name the individual reports are speperate for each case
-   * @return ExprBlockInfo* the datastructure with the result data
-   */
-  ExprBlockInfo* parse_genus_log(std::string log_file_name);
-
 private:
 
   void _init_defaults(); 	//< initialize default parameters for

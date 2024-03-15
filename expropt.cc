@@ -20,8 +20,6 @@
  **************************************************************************/
 
 #include "expropt.h"
-#include "config_pkg.h"
-
 #include <act/types.h>
 #include <common/int.h>
 #include <string.h>
