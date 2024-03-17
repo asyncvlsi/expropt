@@ -207,6 +207,10 @@ public:
   // cleanup and delete abc if it was started
   ~ExternalExprOpt();
 
+
+  // return true if the synthesis engine specified exists
+  static bool engineExists (const char *name);
+
   /**
    *  The common steps for the external expression optimizer are:
    *

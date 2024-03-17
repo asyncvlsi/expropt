@@ -46,6 +46,23 @@ ExternalExprOpt::~ExternalExprOpt()
   }
 }
 
+bool ExternalExprOpt::engineExists (const char *s)
+{
+  // if a mapper string has been specified, find the library!
+  char buf[10240];
+  
+  if (!getenv ("ACT_HOME")) return false;
+  
+  snprintf (buf, 10240, "%s/lib/act_extsyn_%s.so", getenv ("ACT_HOME"), s);
+
+  FILE *fp = fopen (buf, "r");
+  if (!fp) {
+    return false;
+  }
+  fclose (fp);
+  return true;
+}
+
 /**
  * Initialize configuration parameters
  */
@@ -109,17 +126,17 @@ void ExternalExprOpt::_init_defaults ()
   snprintf (buf, 10240, "%s_run", mapper);
   *((void **)&_syn_run)= dlsym (_syn_dlib, buf);
   if (!_syn_run) {
-    fatal_error ("Synthesis library `%s': missing %s!", mapper, buf);
+    fatal_error ("Expression synthesis library `%s': missing %s!", mapper, buf);
   }
   snprintf (buf, 10240, "%s_get_metric", mapper);
   *((void **)&_syn_get_metric) = dlsym (_syn_dlib, buf);
   if (!_syn_get_metric) {
-    fatal_error ("Synthesis library `%s': missing %s", mapper, buf);
+    fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
   }
   snprintf (buf, 10240, "%s_cleanup", mapper);
   *((void **)&_syn_cleanup) = dlsym (_syn_dlib, buf);
   if (!_syn_cleanup) {
-    fatal_error ("Synthesis library `%s': missing %s", mapper, buf);
+    fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
   }
 }
 
@@ -153,7 +170,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
     ihash_bucket_t *b_map,*b_new;
     b_map = ihash_lookup(in_expr_map, (long) e);
     char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
-    sprintf(charbuf,"%s%u",expr_prefix.data(),b_map->i);
+    snprintf(charbuf, 1024, "%s%u",expr_prefix.data(),b_map->i);
     b_new = ihash_add(inexprmap, (long) e);
     b_new->v = charbuf;
   }
@@ -162,7 +179,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
   char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
 
   // the output should be called "out"
-  sprintf(charbuf,"out");
+  snprintf(charbuf,1024, "out");
   b_map = ihash_add(outexprmap,(long) expr);
   b_map->v = charbuf;
 
@@ -176,7 +193,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
 
   // generate module name 
   char expr_set_name[1024];
-  sprintf(expr_set_name, "%s%u",module_prefix.data(), expr_set_number);
+  snprintf(expr_set_name, 1024, "%s%u",module_prefix.data(), expr_set_number);
   
   // and send off
   info = run_external_opt(expr_set_name,
