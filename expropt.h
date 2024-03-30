@@ -310,8 +310,7 @@ public:
    * @param expr_set_name the name of the verilog module
    *
    * @param in_expr_list an act list of expr leaf data
-   * structures/variables, they should be E_VAR and for bundled data
-   * additional E_INT, E_TRUE, E_FALSE, ...
+   * structures/variables, they should be E_VAR
    * @param in_expr_map the map from pointer (as long int) of the expr
    * struct to char* strings, if a mapping for eg. E_INT is defind it
    * will take precidence over printing the value, E_VAR has to have a
@@ -359,8 +358,7 @@ public:
    * 
    * @param expr_set_name the name of the verilog module
    * @param in_expr_list an act list of expr leaf data
-   * structures/variables, they should be E_VAR and for bundled data
-   * additional E_INT, E_TRUE, E_FALSE, ... 
+   * structures/variables, they should be E_VAR
    * @param in_expr_map the map from pointer (as long int) of the expr
    * struct to char* strings, if a mapping for eg. E_INT is defind it
    * will take precidence over printing the value, E_VAR has to have a

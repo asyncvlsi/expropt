@@ -547,13 +547,40 @@ static void _parse_ports (char *buf, int nports, list_t *ports)
 #endif  
 }
 
+static bool my_fgets (char **buf, int *buf_max, FILE *fp)
+{
+  bool ret;
+  int pos = 0;
+
+  (*buf)[0] = '\0';
+  (*buf)[*buf_max-1] = '\0';
+  if (fgets (*buf, *buf_max, fp)) {
+    while ((strlen ((*buf)+pos) == (*buf_max-1-pos)) &&
+	   !feof (fp) && ((*buf)[*buf_max-2] != '\n')) {
+      REALLOC (*buf, char, 2*(*buf_max));
+      pos = *buf_max-1;
+      *buf_max = 2*(*buf_max);
+      if (!fgets (*buf + pos, *buf_max - pos, fp)) {
+	break;
+      }
+    }
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
 bool AbcApi::_endsession()
 {
-  char buf[10240];
+  int buf_max = 10240;
+  char *buf;
 
   if (!_pAbc) {
     return true;
   }
+
+  MALLOC (buf, char, buf_max);
 
   snprintf (buf, 1024, "write_verilog %s", _vout);
   _run_abc (buf);
@@ -570,13 +597,14 @@ bool AbcApi::_endsession()
   FILE *vfp;
   snprintf (buf, 1024, "%s.log", _vout);
   if (!(fp = fopen (buf, "r"))) {
+    FREE (buf);
     return false;
   }
 
   list_t *iports = list_new ();
   list_t *oports = list_new ();
 
-  while (fgets (buf, 10240, fp)) {
+  while (my_fgets (&buf, &buf_max, fp)) {
     if (strncmp (buf, "Primary inputs ", 15) == 0) {
       int pos = 15;
       int inp;
@@ -716,6 +744,8 @@ bool AbcApi::_endsession()
   fflush (stderr);
   close (_logfd);
   _pAbc = NULL;
+
+  FREE (buf);
   Abc_Stop ();
 
   return true;

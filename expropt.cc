@@ -307,6 +307,21 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 {
   ExprBlockInfo* info = NULL;
 
+  /*
+    Check if this call has been cached; if so, use the saved results!
+
+    Cache organization:
+
+     $ACT_CACHE -- if it exists, otherwise $HOME/.act_cache
+
+     For this, the cache is:
+        $ACT_CACHE/syn/<mapper>/$ACT_TECH/
+
+     index.db : list of proc names + metrics
+     <procname>.act : for each proc name
+  */
+
+
   // consruct files names for the temp files
   std::string verilog_file = "./";
   verilog_file.append(VERILOG_FILE_PREFIX);
