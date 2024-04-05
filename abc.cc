@@ -109,6 +109,8 @@ static double parse_abc_info (const char *file, double *area)
 	double tot_area;
 	if (sscanf (buf, "%s Fanin = %*d Instance = %d Area = %lg",
 		    cellname, &inst, &tot_area) == 3) {
+	  // um^2
+	  tot_area *= 1e-12;
 	  if (area) {
 	    *area += tot_area;
 	  }
@@ -128,6 +130,10 @@ double abc_get_metric (act_syn_info *s, expropt_metadata type)
     double res, area;
     res = parse_abc_info (s->v_out, &area);
     if (type == metadata_area) {
+      if (!config_exists ("expropt.abc_use_constraints") ||
+	  !(config_get_int ("expropt.abc_use_constraints") == 1)) {
+	return -1.0;
+      }
       return area;
     }
     else {

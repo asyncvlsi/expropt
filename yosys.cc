@@ -82,6 +82,10 @@ static double parse_yosys_info (const char *file, double *area)
     _cell_info[i].count = 0;
   }
 
+  if (area) {
+    *area = 0;
+  }
+
   while (fgets (buf, 10240, fp)) {
     if (strncmp (buf, "ABC:", 4) == 0) {
       char *tmp = strstr (buf, "Delay =");
@@ -130,9 +134,12 @@ static double parse_yosys_info (const char *file, double *area)
   if (area) {
     int i;
     *area = 0;
+
     for (i=0; i < sizeof (_cell_info)/sizeof (_cell_info[0]); i++) {
       *area += _cell_info[i].area * _cell_info[i].count;
     }
+    // in um^2, so SI units
+    *area = *area * 1e-12;
   }
   fclose (fp);
   return ret;
@@ -246,8 +253,13 @@ double yosys_get_metric (act_syn_info *s, expropt_metadata type)
 {
   if (type == metadata_area || type == metadata_delay_typ) {
     double res, area;
+
     res = parse_yosys_info (s->v_out, &area);
     if (type == metadata_area) {
+      if (!config_exists ("expropt.abc_use_constraints") ||
+	  !(config_get_int ("expropt.abc_use_constraints") == 1)) {
+	return -1.0;
+      }
       return area;
     }
     else {

@@ -452,30 +452,41 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   double area = 0.0;
 
   area = (*_syn_get_metric) (&syn, metadata_area);
-    
-  delay.
-    set_metrics ((*_syn_get_metric) (&syn, metadata_delay_min),
-		 (*_syn_get_metric) (&syn, metadata_delay_typ),
-		 (*_syn_get_metric) (&syn, metadata_delay_max)
-		 );
 
-  static_power.
-    set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ_static),
-		 (*_syn_get_metric) (&syn, metadata_power_typ_static),
-		 (*_syn_get_metric) (&syn, metadata_power_max_static)
-		 );
+  if (area == 0.0) {
+    delay.set_metrics (0, 0, 0);
+    static_power.set_metrics (0, 0, 0);
+    dynamic_power.set_metrics (0, 0, 0);
+    total_power.set_metrics (0, 0, 0);
+  }
+  else if (area == -1) {
+    // not found!
+  }
+  else {
+    delay.
+      set_metrics ((*_syn_get_metric) (&syn, metadata_delay_min),
+		   (*_syn_get_metric) (&syn, metadata_delay_typ),
+		   (*_syn_get_metric) (&syn, metadata_delay_max)
+		   );
 
-  dynamic_power.
-    set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ_dynamic),
-		 (*_syn_get_metric) (&syn, metadata_power_typ_dynamic),
-		 (*_syn_get_metric) (&syn, metadata_power_max_dynamic)
-		 );
+    static_power.
+      set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ_static),
+		   (*_syn_get_metric) (&syn, metadata_power_typ_static),
+		   (*_syn_get_metric) (&syn, metadata_power_max_static)
+		   );
+
+    dynamic_power.
+      set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ_dynamic),
+		   (*_syn_get_metric) (&syn, metadata_power_typ_dynamic),
+		   (*_syn_get_metric) (&syn, metadata_power_max_dynamic)
+		   );
     
-  total_power.
-    set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ),
-		 (*_syn_get_metric) (&syn, metadata_power_typ),
-		 (*_syn_get_metric) (&syn, metadata_power_max)
-		 );
+    total_power.
+      set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ),
+		   (*_syn_get_metric) (&syn, metadata_power_typ),
+		   (*_syn_get_metric) (&syn, metadata_power_max)
+		   );
+  }
 
   info =  new ExprBlockInfo(delay,
 			    total_power,
