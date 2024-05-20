@@ -365,7 +365,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   case (E_QUERY):
     tmp = print_expression (output_stream, e->u.e.l, exprmap);
     lidx = print_expression (output_stream, e->u.e.r->u.e.l, exprmap, &lw);
-    ridx = print_expression (output_stream, e->u.e.r->u.e.l, exprmap, &rw);
+    ridx = print_expression (output_stream, e->u.e.r->u.e.r, exprmap, &rw);
     resw = act_expr_bitwidth (e->type, lw, rw);
 
     DUMP_DECL_ASSIGN;
