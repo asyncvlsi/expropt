@@ -418,19 +418,38 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   // => output filename empty
   if (!expr_output_file.empty()) {
     if (expr_channel_type.compare("bool") != 0) {
-      snprintf(cmd, 4096, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
-	       expr_channel_type.data(),
-	       cell_act_file.data(),
-	       cell_namespace.data(),
-	       mapped_file.data(),
-	       expr_output_file.data());
+      if (!(syn.use_tie_cells)) {
+        snprintf(cmd, 4096, "v2act -t -a -C \"%s\" -l %s -n %s %s >> %s",
+          expr_channel_type.data(),
+          cell_act_file.data(),
+          cell_namespace.data(),
+          mapped_file.data(),
+          expr_output_file.data());
+      }
+      else {
+        snprintf(cmd, 4096, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
+          expr_channel_type.data(),
+          cell_act_file.data(),
+          cell_namespace.data(),
+          mapped_file.data(),
+          expr_output_file.data());
+      }
     }
     else {
-      snprintf(cmd, 4096, "v2act -l %s -n %s %s >> %s",
-	       cell_act_file.data(),
-	       cell_namespace.data(),
-	       mapped_file.data(),
-	       expr_output_file.data());
+      if (!(syn.use_tie_cells)) {
+        snprintf(cmd, 4096, "v2act -t -l %s -n %s %s >> %s",
+          cell_act_file.data(),
+          cell_namespace.data(),
+          mapped_file.data(),
+          expr_output_file.data());
+      }
+      else {
+        snprintf(cmd, 4096, "v2act -l %s -n %s %s >> %s",
+          cell_act_file.data(),
+          cell_namespace.data(),
+          mapped_file.data(),
+          expr_output_file.data());
+      }
     }
     
     if (config_get_int("expropt.verbose") == 2) {
