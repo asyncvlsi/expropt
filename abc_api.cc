@@ -82,11 +82,8 @@ AbcApi::~AbcApi()
   if (waitpid (_childpid, &stat, 0) < 0) {
     fatal_error ("Error in waitpid() call!");
   }
-  for (int i=0; i < 256; i++) {
-    if (i == _fd.from || i == _fd.to) {
-      close (i);
-    }
-  }
+  close (_fd.from);
+  close (_fd.to);
 }
 
 
