@@ -417,7 +417,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   // as a channel.  skip if run was just for extraction of properties
   // => output filename empty
   if (!expr_output_file.empty()) {
-    if (expr_channel_type.compare("bool") != 0) {
+    if (wire_encoding == qdi) {
       // QDI, so we don't add tie cells
       snprintf(cmd, 4096, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
 	       expr_channel_type.data(),
