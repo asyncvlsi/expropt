@@ -84,6 +84,7 @@ AbcApi::~AbcApi()
   }
   close (_fd.from);
   close (_fd.to);
+  unlink ("abc.history");
 }
 
 
