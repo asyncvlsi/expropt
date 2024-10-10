@@ -12,7 +12,6 @@ To use it, make sure you have act properly installed and $ACT_HOME is pointing t
 
 Use:
 ```
-./configure
 make depend
 make 
 make install
@@ -21,9 +20,14 @@ make install
 
 This library is an addon for the ACT language and core tools (https://github.com/asyncvlsi/act), so they need to be installed, and the tool can not be built without them.
 
-The library requires you to have yosys (https://github.com/cliffordwolf/yosys.git) and abc (https://github.com/berkeley-abc/abc) and sed (check you package manager) installed on your system and the excutables to be in your $path during runtime use.
+The library requires the standard Unix tool sed (check you package manager) installed on your system and the excutables to be in your $path during runtime use.
 
-For commercial synthesis, check the exproptcommercial library (closed source because tool APIs are under NDA). It will be automatically picked up if installed on your system as a shared library.
+The library has been parameterized so that it picks up any logic synthesis
+tool for which the appropriate shared object modules have been installed on
+your system. By default, we provide these modules for both abc and yosys.
+The yosys module requires that the yosys logic synthesis tool has been installed
+on your system.
+
 
 ## Example and Test Dependencies
 
