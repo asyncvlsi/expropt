@@ -12,10 +12,9 @@ To use it, make sure you have act properly installed and $ACT_HOME is pointing t
 
 Use:
 ```
-make depend
-make 
-make install
+./build.sh
 ```
+
 ## Dependencies
 
 This library is an addon for the ACT language and core tools (https://github.com/asyncvlsi/act), so they need to be installed, and the tool can not be built without them.
