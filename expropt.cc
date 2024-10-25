@@ -138,6 +138,8 @@ void ExternalExprOpt::_init_defaults ()
   if (!_syn_cleanup) {
     fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
   }
+
+  _filenum = 0;
 }
 
 
@@ -325,7 +327,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   // consruct files names for the temp files
   std::string verilog_file = "./";
   verilog_file.append(VERILOG_FILE_PREFIX);
-  verilog_file.append(expr_set_name);
+  //verilog_file.append(expr_set_name);
+  verilog_file.append (std::to_string (_filenum++));
   
   std::string mapped_file = verilog_file.data();
   mapped_file.append(MAPPED_FILE_SUFFIX);

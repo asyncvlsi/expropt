@@ -519,6 +519,8 @@ private:
     double (*_syn_get_metric) (act_syn_info *s, expropt_metadata type);
     void (*_syn_cleanup) (act_syn_info *s);
     void *_syn_dlib;
+
+    int _filenum;
 };
 
 
