@@ -64,6 +64,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
 
   
   listitem_t *li_search;
+  struct Hashtable *repeats;
+  repeats = hash_new (4);
   for (li = list_first (in_list); li; li = list_next (li)) {
     if (first) {
       first=false;
@@ -75,23 +77,24 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       (char *) ihash_lookup(inexprmap, (long) list_value (li))->v;
     
     bool skip = false;
-    // omit ports with the same name
-    for (li_search = list_next (li); li_search; li_search = list_next (li_search))
-    {
-      std::string search =  (char *) ihash_lookup(inexprmap, (long) list_value (li_search))->v;
-      if (current.compare(search) == 0) {
-        skip = true;
-        break;
-      }
+
+    if (hash_lookup (repeats, current.c_str())) {
+      skip = true;
     }
+    else {
+      hash_add (repeats, current.c_str());
+    }
+    
     if (!skip) {
       fprintf(output_stream, "%s", current.data());
       list_append (all_names, current.data());
     }
   }
-  
+  hash_free (repeats);
+
   // ... then outputs
   listitem_t *li_name = list_first (out_expr_name_list);
+  repeats = hash_new (4);
   for (li = list_first (out_list); li; li = list_next (li)) {
     if (first) {
       first=false;
@@ -102,14 +105,11 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     Assert(li_name, "output name list and output expr list dont have the same length");
     std::string current = (char *) list_value (li_name);
     bool skip = false;
-    // omit ports with the same name
-    for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
-    {
-      std::string search =  (char *) list_value (li_search);
-      if (current.compare(search) == 0) {
-        skip = true;
-        break;
-      }
+    if (hash_lookup (repeats, current.c_str())) {
+      skip = true;
+    }
+    else {
+      hash_add (repeats, current.c_str());
     }
     if (!skip) {
       fprintf(output_stream, "%s", current.data());
@@ -118,24 +118,24 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     li_name = list_next(li_name);
   }
   fprintf(output_stream, " );\n");
+  hash_free (repeats);
 
   int vectorize = (config_get_int("expropt.vectorize_all_ports") == 0) ? 0 : 1;
 
   _varwidths.clear();
   // print input ports with bitwidth
   fprintf(output_stream, "\n\t// print input ports with bitwidth\n");
-  
+
+  repeats = hash_new (4);
   for (li = list_first (in_list); li; li = list_next (li)) {
     // make sure you dont print a port 2+ times - the tools really dont like that
     std::string current = (char *) ihash_lookup(inexprmap, (long) list_value (li))->v;
     bool skip = false;
-    for (li_search = list_next (li); li_search; li_search = list_next (li_search))
-    {
-      std::string search =  (char *) ihash_lookup(inexprmap, (long) list_value (li_search))->v;
-      if (current.compare(search) == 0) {
-        skip = true;
-        break;
-      }
+    if (hash_lookup (repeats, current.c_str())) {
+      skip = true;
+    }
+    else {
+      hash_add (repeats, current.c_str());
     }
     if (skip) continue;
     // look up the bitwidth
@@ -145,24 +145,24 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     else fprintf(output_stream, "\tinput [%i:0] %s ;\n", width-1, current.data());
     _varwidths[current] = width;
   }
+  hash_free (repeats);
 
   // print output ports with bitwidth
   fprintf(output_stream, "\n\t// print output ports with bitwidth\n");
   li_name = list_first (out_expr_name_list);
+  repeats = hash_new (4);
   for (li = list_first (out_list); li; li = list_next (li))
   {
     // make sure you dont print a port 2+ times - the tools really dont like that
     Assert(li_name, "output name list and output expr list dont have the same length");
     std::string current = (char *) list_value (li_name);
     bool skip = false;
-    // omit ports with the same name
-    for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
-    {
-      std::string search =  (char *) list_value (li_search);
-      if (current.compare(search) == 0) {
-        skip = true;
-        break;
-      }
+    
+    if (hash_lookup (repeats, current.c_str())) {
+      skip = true;
+    }
+    else {
+      hash_add (repeats, current.c_str());
     }
     li_name = list_next(li_name);
     if (skip) continue;
@@ -173,8 +173,10 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     else fprintf(output_stream, "\toutput [%i:0] %s ;\n", width-1, current.data());
     _varwidths[current] = width;
   }
+  hash_free (repeats);
 
   //the hidden logic statements
+  repeats = hash_new (4);
   if (expr_list != NULL && hidden_expr_name_list != NULL && !list_isempty(expr_list) && !list_isempty(hidden_expr_name_list))
   {
     li_name = list_first (hidden_expr_name_list);
@@ -185,15 +187,13 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       Assert(li_name, "output name list and output expr list dont have the same length");
       std::string current = (char *) list_value (li_name);
       bool skip = false;
-      // omit ports with the same name
-      for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
-      {
-        std::string search =  (char *) list_value (li_search);
-        if (current.compare(search) == 0) {
-          skip = true;
-          break;
-        }
+      if (hash_lookup (repeats, current.c_str())) {
+	skip = true;
       }
+      else {
+	hash_add (repeats, current.c_str());
+      }
+      // omit ports with the same name
       li_name = list_next(li_name);
       if (skip) continue;
       // the bitwidth
@@ -205,6 +205,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       _varwidths[current] = width;
     }
   }
+  hash_free (repeats);
 
   dummy_char = 'a';
   do {
@@ -226,6 +227,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   list_free (all_names);
 
   //the hidden logic statements
+  repeats = hash_new (4);
   if (expr_list != NULL && hidden_expr_name_list != NULL && !list_isempty(expr_list) && !list_isempty(hidden_expr_name_list))
   {
     li_name = list_first (hidden_expr_name_list);
@@ -236,14 +238,11 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       Assert(li_name, "output name list and output expr list dont have the same length");
       std::string current = (char *) list_value (li_name);
       bool skip = false;
-      // omit ports with the same name
-      for (li_search = list_next (li_name); li_search; li_search = list_next (li_search))
-      {
-        std::string search =  (char *) list_value (li_search);
-        if (current.compare(search) == 0) {
-          skip = true;
-          break;
-        }
+      if (hash_lookup (repeats, current.c_str())) {
+	skip = true;
+      }
+      else {
+	hash_add (repeats, current.c_str());
       }
       li_name = list_next(li_name);
       if (skip) continue;
