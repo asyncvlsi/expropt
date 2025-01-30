@@ -334,7 +334,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   
   switch (e->type) {
   case E_BUILTIN_BOOL:
-    lidx = print_expression(output_stream, e->u.e.l, exprmap);
+    lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
 
     /* lhs, res has bitwidth 1 */
     resw = 1;
@@ -346,7 +346,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     break;
 
   case E_BUILTIN_INT:
-    lidx = print_expression(output_stream, e->u.e.l, exprmap);
+    lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
     
     if (!e->u.e.r) {
       resw = 1;
@@ -362,7 +362,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     break;
 
   case (E_QUERY):
-    tmp = print_expression (output_stream, e->u.e.l, exprmap);
+    tmp = print_expression (output_stream, e->u.e.l, exprmap, &lw);
     lidx = print_expression (output_stream, e->u.e.r->u.e.l, exprmap, &lw);
     ridx = print_expression (output_stream, e->u.e.r->u.e.r, exprmap, &rw);
     resw = act_expr_bitwidth (e->type, lw, rw);
