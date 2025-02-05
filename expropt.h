@@ -96,6 +96,7 @@ private:
   metric_triplet static_power;	//< power value (W)
   metric_triplet dynamic_power; //<  power value (W)
   metric_triplet total_power;	//<  total power (W)
+  long long mapper_runtime; //<  logic synthesis tool runtime (us)
 
   /**
    * the theoretical area of all gates combined, with 100% utiliasation.
@@ -110,6 +111,7 @@ public:
   metric_triplet getDynamicPower() { return dynamic_power; }
   metric_triplet getPower() { return total_power; }
   double getArea() { return area; }
+  long long getRuntime() { return mapper_runtime; }
 
   /**
    * Construct a new Expr Block Info object, values can not be changed after creation.
@@ -120,12 +122,14 @@ public:
 		const metric_triplet e_power,
 		const metric_triplet e_static_power,
 		const metric_triplet e_dynamic_power,
-		const double e_area) :
+		const double e_area,
+    const long long e_runtime) :
     delay{e_delay},
     total_power{e_power},
     static_power{e_static_power},
     dynamic_power{e_dynamic_power},
-    area{e_area}
+    area{e_area},
+    mapper_runtime{e_runtime}
   { }
                     
   /**

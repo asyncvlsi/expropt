@@ -25,6 +25,8 @@
 #include <string.h>
 #include "abc_api.h"
 #include <dlfcn.h>
+#include <chrono>
+using namespace std::chrono;
 
 #define VERILOG_FILE_PREFIX "exprop_"
 #define MAPPED_FILE_SUFFIX "_mapped"
@@ -411,9 +413,12 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
     syn.space  = _abc_api;
   }
   
+  auto start = high_resolution_clock::now();
   if (!(*_syn_run) (&syn)) {
     fatal_error ("Synthesis %s failed.", mapper);
   }
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
 
   // read the resulting netlist and map it back to act, if the
   // wire_type is not bool use the async mode the specify a wire type
@@ -505,7 +510,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 			    total_power,
 			    static_power,
 			    dynamic_power,
-			    area);
+			    area,
+          duration.count());
 
   // clean up temporary files
   if (_cleanup) {
