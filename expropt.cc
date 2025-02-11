@@ -25,6 +25,8 @@
 #include <string.h>
 #include "abc_api.h"
 #include <dlfcn.h>
+#include <chrono>
+using namespace std::chrono;
 
 #define VERILOG_FILE_PREFIX "exprop_"
 #define MAPPED_FILE_SUFFIX "_mapped"
@@ -351,6 +353,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 		"verilog file %s is not writable", verilog_file.data());
   }
 
+  std::chrono::microseconds io_duration(0);
+
   // generate verilog module
   {
     char buf[1024];
@@ -363,6 +367,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
       snprintf (buf, 1024, "%stmp", expr_set_name);
       module_name = buf;
     }
+    auto start_print_verilog = high_resolution_clock::now();
     print_expr_verilog(verilog_stream, module_name,
 		       in_expr_list,
 		       in_expr_map,
@@ -372,6 +377,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 		       out_width_map,
 		       hidden_expr_list,
 		       hidden_expr_name_list);
+    auto stop_print_verilog = high_resolution_clock::now();
+    io_duration += duration_cast<microseconds>(stop_print_verilog - start_print_verilog);
   }
 
   // close Verilog file
@@ -411,9 +418,12 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
     syn.space  = _abc_api;
   }
   
+  auto start_mapper = high_resolution_clock::now();
   if (!(*_syn_run) (&syn)) {
     fatal_error ("Synthesis %s failed.", mapper);
   }
+  auto stop_mapper = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop_mapper - start_mapper);
 
   // read the resulting netlist and map it back to act, if the
   // wire_type is not bool use the async mode the specify a wire type
@@ -454,7 +464,10 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
       fflush(stdout);
     }
     
+    auto start_v2act = high_resolution_clock::now();
     exec_failure = system(cmd);
+    auto stop_v2act = high_resolution_clock::now();
+    io_duration += duration_cast<microseconds>(stop_v2act - start_v2act);
     if (exec_failure != 0) {
       fatal_error("external program call \"%s\" failed.", cmd);
     }
@@ -505,7 +518,10 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 			    total_power,
 			    static_power,
 			    dynamic_power,
-			    area);
+			    area,
+          duration.count(),
+          io_duration.count()
+          );
 
   // clean up temporary files
   if (_cleanup) {
