@@ -70,7 +70,6 @@ bool ExternalExprOpt::engineExists (const char *s)
  */
 void ExternalExprOpt::_init_defaults ()
 {
-  ExprCache ec;
   // clear tmp files by default
   config_set_default_int ("expropt.clean_tmp_files", 1);
 
@@ -228,6 +227,10 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
     FREE (b_map->v);
   }
   ihash_free(inexprmap);
+
+  ExprCache ec;
+  Assert (info, "no info?");
+  ec.add_expr_to_cache(expr, info);
 
   return info;
 }
@@ -528,6 +531,6 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   if (_cleanup) {
     (*_syn_cleanup) (&syn);
   }
-  
+
   return info;
 }

@@ -28,21 +28,45 @@
 #include <act/act.h>
 #include "expr_info.h"
 
-typedef long long expr_path;
+typedef int expr_path;
+
+enum class MetricID {Delay};
 
 class ExprCache {
 public:
 
     ExprCache ();
     void read_cache ();
-    void add_expr_to_cache (Expr *);
+    void add_expr_to_cache (Expr *, ExprBlockInfo *);
     bool expr_in_cache (Expr *);
     ExprBlockInfo get_expr_info (Expr *);
 
 private:
+
+    void read_cache_index_line (std::string);
+    void write_cache_index_line (std::string);
+
+    std::string _gen_unique_id (Expr *);
+
+    // gotta change this for different fodler name formats
+    expr_path gen_expr_path () {
+        return cache_counter++;
+    }
+
     char *path;
     char *index_file;
     char idx_file_delimiter;
+    int n_metrics;
+    int n_cols;
+    int area_id;
+    int mapper_runtime_id;
+    int io_runtime_id;
+
+    int cache_counter;
+
+    // ID-to-path
     std::unordered_map<std::string, expr_path> path_map;
+    // Path-to-info
+    std::unordered_map<expr_path, ExprBlockInfo> info_map;
 
 };
