@@ -48,6 +48,9 @@ bool abc_run (act_syn_info *s)
     fatal_error ("Could not open `%s' file!", sdc_file);
   }
   fprintf (fp, "set_load %g\n", config_get_real ("expropt.default_load"));
+  if (config_exists("expropt.driving_cell")) {
+    fprintf (fp, "set_driving_cell %s\n", config_get_string ("expropt.driving_cell"));
+  }
   fclose (fp);
   FREE (sdc_file);
 
