@@ -20,13 +20,7 @@
  **************************************************************************/
 
 #include "expropt.h"
-#include <act/types.h>
-#include <common/int.h>
-#include <string.h>
 #include "abc_api.h"
-#include <dlfcn.h>
-#include <chrono>
-using namespace std::chrono;
 
 #define VERILOG_FILE_PREFIX "exprop_"
 #define MAPPED_FILE_SUFFIX "_mapped"
@@ -227,10 +221,6 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
     FREE (b_map->v);
   }
   ihash_free(inexprmap);
-
-  ExprCache ec;
-  Assert (info, "no info?");
-  ec.add_expr_to_cache(expr, info);
 
   return info;
 }

@@ -24,9 +24,9 @@
 
 #include <stdio.h>
 #include <iostream>
-#include <fstream>
 #include <sstream>
 #include "expr_cache.h"
+
 #include <filesystem>
 namespace fs = std::filesystem;
 
@@ -34,7 +34,25 @@ expr_path to_expr_path (std::string x) {
     return std::stoi(x);
 }
 
-ExprCache::ExprCache()
+char *ExprCache::get_cache_loc()
+{
+    Assert (getenv("ACT_SYNTH_CACHE"), "Could not find cache location");
+    return getenv("ACT_SYNTH_CACHE");
+}
+
+ExprCache::ExprCache(const char *datapath_syntesis_tool,
+                     const expr_mapping_target mapping_target,
+                     const bool tie_cells,
+                     const std::string expr_file_path,
+                     const std::string exprid_prefix, 
+                     const std::string block_prefix)
+ :
+    ExternalExprOpt ( datapath_syntesis_tool,
+                      mapping_target,
+                      tie_cells,
+                      expr_file_path,
+                      exprid_prefix,
+                      block_prefix) 
 {
     if (getenv("ACT_SYNTH_CACHE")==NULL) {
         setenv("ACT_SYNTH_CACHE", (std::string(getenv("ACT_HOME"))+std::string("/cache")).c_str(), 1);
@@ -60,6 +78,7 @@ ExprCache::ExprCache()
         idx_file << "# Expression cache index and metrics file" << std::endl;
         idx_file << "# Metrics except area are in triplets (min,typ,max)" << std::endl;
         idx_file << "# Format: <unique_id> <dir_name> <delay> <static power> <dynamic power> <total power> <area> <mapper_runtime> <io_runtime>" << std::endl;
+        idx_file << "# Type: <string> <int> <double (s)> <double (W)> <double (W)> <double (W)> <double (W)> <mapper_runtime (us)> <io_runtime (us)>" << std::endl;
         idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
         idx_file.close();
     }
@@ -80,29 +99,36 @@ ExprCache::ExprCache()
     cache_counter = 0;
 }
 
-std::string ExprCache::_gen_unique_id (Expr *e)
+std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable *width_map)
 {
     list_t *vars = list_new();
     act_expr_collect_ids (vars, e);
     std::string uniq_id = act_expr_to_string(vars, e);
-    for (listitem_t *li = list_first(vars); li; li = li->next) {
-        uniq_id.append("_");
-        ActId *id = (ActId *)(list_value(li));
+    for (listitem_t *li = list_first(in_expr_list); li; li = li->next) {
+        Expr *evar = (Expr *)(list_value(li));
+        auto b = ihash_lookup(width_map, (long)evar);
+        Assert (b, "var. width not found");
+        int width = b->i;
         // gotta append bitwidth   
+        uniq_id.append("_");
+        uniq_id.append(std::to_string(width));
     }
     return uniq_id;
 }
 
-void ExprCache::add_expr_to_cache (Expr *e, ExprBlockInfo *eb)
+void ExprCache::add_expr_to_cache (Expr *e, list_t *in_expr_list, iHashtable *width_map, ExprBlockInfo *eb)
 {
-    list_t *vars = list_new();
-    act_expr_collect_ids (vars, e);
-    std::string uniq_id = act_expr_to_string(vars, e);
-    Assert (!path_map.contains(uniq_id), "Unique expr. ID conflict");
+    std::string uniq_id = _gen_unique_id(e, in_expr_list, width_map);
+    if (path_map.contains(uniq_id)) {
+        return;
+    }
+
     path_map.insert({uniq_id, gen_expr_path()});
     info_map.insert({path_map[uniq_id],*eb});
-
     write_cache_index_line (uniq_id);
+
+
+
 }
 
 void ExprCache::read_cache()
@@ -115,7 +141,6 @@ void ExprCache::read_cache()
 
     std::string line;
     while (std::getline(idx_file, line)) {
-        std::cout << line << "\n";
         std::istringstream ss(line);
         if (line.at(0)=='#') {
             continue; // comment
@@ -137,12 +162,13 @@ void ExprCache::read_cache_index_line (std::string line) {
     
     Assert (tokens.size()==n_cols, "Malformed index file");
 
-    if (!(fs::exists(tokens[1]) && fs::is_directory(tokens[1]))) {
-        std::cerr << "Error: cache directory does not exist for " << tokens[1] << std::endl;
-        exit(1);
-    }
+    // if (!(fs::exists(tokens[1]) && fs::is_directory(tokens[1]))) {
+    //     std::cerr << "Error: cache directory does not exist for " << tokens[1] << std::endl;
+    //     exit(1);
+    // }
 
     expr_path loc = to_expr_path(tokens[1]);
+    Assert (!path_map.contains(tokens[0]), "duplicate expression in cache index");
     path_map.insert({tokens[0],loc});
 
     std::vector<metric_triplet> tmp = {};
@@ -164,6 +190,7 @@ void ExprCache::read_cache_index_line (std::string line) {
     double io_runtime = std::stod(tokens[io_runtime_id]);
 
     ExprBlockInfo eb (del, pow, st_pow, dyn_pow, area, mapper_runtime, io_runtime);
+    Assert (!info_map.contains(loc), "duplicate data in cache index file");
     info_map.insert({loc, eb});
 }
 

@@ -21,6 +21,18 @@
  */
 #pragma once
 
+#include <act/types.h>
+#include <common/int.h>
+#include <string.h>
+#include <dlfcn.h>
+
+#include <unordered_map>
+#include <string>
+#include <act/act.h>
+
+#include <chrono>
+using namespace std::chrono;
+
 /*
  * enum for referencing the pass type
  */

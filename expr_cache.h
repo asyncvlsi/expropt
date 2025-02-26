@@ -23,30 +23,34 @@
  */
 #pragma once
 
-#include <unordered_map>
-#include <string>
-#include <act/act.h>
-#include "expr_info.h"
+#include "expropt.h"
 
 typedef int expr_path;
 
 enum class MetricID {Delay};
 
-class ExprCache {
+class ExprCache : public ExternalExprOpt {
 public:
 
-    ExprCache ();
+    ExprCache( const char *datapath_syntesis_tool,
+                const expr_mapping_target mapping_target,
+                const bool tie_cells,
+                const std::string expr_file_path = "",
+                const std::string exprid_prefix = "e",
+                const std::string block_prefix = "blk");
+                
     void read_cache ();
-    void add_expr_to_cache (Expr *, ExprBlockInfo *);
+    void add_expr_to_cache (Expr *, list_t *, iHashtable *, ExprBlockInfo *);
     bool expr_in_cache (Expr *);
     ExprBlockInfo get_expr_info (Expr *);
+    char *get_cache_loc ();
 
 private:
 
     void read_cache_index_line (std::string);
     void write_cache_index_line (std::string);
 
-    std::string _gen_unique_id (Expr *);
+    std::string _gen_unique_id (Expr *, list_t *, iHashtable *);
 
     // gotta change this for different fodler name formats
     expr_path gen_expr_path () {
