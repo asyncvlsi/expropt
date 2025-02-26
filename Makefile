@@ -32,7 +32,9 @@ TARGETINCSUBDIR=act
 
 TARGETCONF=expropt.conf
 
-OBJS2=expropt.o verilog.o abc_api.o
+CPPSTD=c++20
+
+OBJS2=expropt.o verilog.o abc_api.o expr_cache.o
 
 OBJS= $(OBJS2)
 

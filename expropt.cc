@@ -70,6 +70,7 @@ bool ExternalExprOpt::engineExists (const char *s)
  */
 void ExternalExprOpt::_init_defaults ()
 {
+  ExprCache ec;
   // clear tmp files by default
   config_set_default_int ("expropt.clean_tmp_files", 1);
 
