@@ -34,7 +34,8 @@ static const std::string _tmp_expr_file = "tmp_expr.act";
 class ExprCache : public ExternalExprOpt {
 public:
 
-    ExprCache( const char *datapath_synthesis_tool,
+    ExprCache( bool invalidate_cache, 
+                const char *datapath_synthesis_tool,
                 const expr_mapping_target mapping_target,
                 const bool tie_cells,
                 const std::string expr_file_path = "");

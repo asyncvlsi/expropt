@@ -40,10 +40,12 @@ char *ExprCache::get_cache_loc()
     return getenv("ACT_SYNTH_CACHE");
 }
 
-ExprCache::ExprCache(const char *datapath_synthesis_tool,
+ExprCache::ExprCache(bool invalidate_cache,
+                     const char *datapath_synthesis_tool,
                      const expr_mapping_target mapping_target,
                      const bool tie_cells,
-                     const std::string expr_file_path)
+                     const std::string expr_file_path
+                     )
  :  ExternalExprOpt ( datapath_synthesis_tool,
                       mapping_target,
                       tie_cells,
@@ -57,6 +59,14 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
     }
     path = getenv("ACT_SYNTH_CACHE");
     
+    if (invalidate_cache) {
+        Assert(path, "what");
+        std::string del_files_cmd = std::string("rm ") + std::string(path) + std::string("/*.act");
+        std::string del_index_cmd = std::string("rm ") + std::string(path) + std::string("/expr.index");
+        system(del_files_cmd.c_str());
+        system(del_index_cmd.c_str());
+    }
+
     fs::path cache_path = path;
     if (!fs::exists(cache_path)) {
         if (!(fs::create_directories(cache_path))) {
