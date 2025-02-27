@@ -43,17 +43,15 @@ char *ExprCache::get_cache_loc()
 ExprCache::ExprCache(const char *datapath_syntesis_tool,
                      const expr_mapping_target mapping_target,
                      const bool tie_cells,
-                     const std::string expr_file_path,
-                     const std::string exprid_prefix, 
-                     const std::string block_prefix)
- :
-    ExternalExprOpt ( datapath_syntesis_tool,
+                     const std::string expr_file_path)
+ :  ExternalExprOpt ( datapath_syntesis_tool,
                       mapping_target,
                       tie_cells,
-                      expr_file_path,
-                      exprid_prefix,
-                      block_prefix) 
+                      _tmp_expr_file,
+                      "in_",
+                      "blk_") 
 {
+    _expr_file_path = expr_file_path;
     if (getenv("ACT_SYNTH_CACHE")==NULL) {
         setenv("ACT_SYNTH_CACHE", (std::string(getenv("ACT_HOME"))+std::string("/cache")).c_str(), 1);
     }
@@ -97,6 +95,7 @@ ExprCache::ExprCache(const char *datapath_syntesis_tool,
 
     // initialize cache counter
     cache_counter = 0;
+    read_cache();
 }
 
 std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable *width_map)
@@ -116,19 +115,83 @@ std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable
     return uniq_id;
 }
 
-void ExprCache::add_expr_to_cache (Expr *e, list_t *in_expr_list, iHashtable *width_map, ExprBlockInfo *eb)
+/*
+    top-level function - this is what you would call instead of 
+    run_external_opt for the expropt object
+*/
+ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
+                                    int targetwidth,
+                                    Expr *expr,
+                                    list_t *in_expr_list,
+                                    iHashtable *in_expr_map,
+                                    iHashtable *in_width_map)
 {
-    std::string uniq_id = _gen_unique_id(e, in_expr_list, width_map);
+    std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map);
+
+    // already have it
     if (path_map.contains(uniq_id)) {
-        return;
+        auto idx = path_map.at(uniq_id);
+        Assert (info_map.contains(idx), "Could not find path to cached process.");
+        // read the cached defproc
+        Assert (fs::exists(path), "what");
+        std::string fn = path;
+        fn.append("/");
+        fn.append(std::to_string(idx));
+        fn.append(".act");
+
+        // append all contents of reqd. cache file to output expr file
+        std::ifstream sourceFile(fn);
+        if (!sourceFile.is_open()) {
+            std::cerr << "Error opening source file: " << fn << "\n";
+            exit(1);
+        }
+        std::ofstream destFile(_expr_file_path, std::ios::app);
+        if (!destFile.is_open()) {
+            std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
+            exit(1);
+        }
+        destFile << sourceFile.rdbuf();
+    }
+    // gotta synth and add to cache
+    else {
+        ExprBlockInfo *ebi = run_external_opt(expr_set_number, targetwidth, expr, in_expr_list, in_expr_map, in_width_map);
+        auto idx = gen_expr_path();
+        path_map.insert({uniq_id, idx});
+        Assert (!info_map.contains(idx), "cache identifier conflict");
+        info_map.insert({idx, *ebi});
+
+        // save the defproc into the cache file
+        Assert (fs::exists(path), "what");
+        std::string fn = path;
+        fn.append("/");
+        fn.append(std::to_string(idx));
+        fn.append(".act");
+        Assert (!fs::exists(fn), "cache file already exists?");
+
+        // append all contents of tmp expr file to cache file
+        std::ifstream sourceFile(_tmp_expr_file);
+        if (!sourceFile.is_open()) {
+            std::cerr << "Error opening source file: " << _tmp_expr_file << "\n";
+            exit(1);
+        }
+        std::ofstream destFile(fn);
+        if (!destFile.is_open()) {
+            std::cerr << "Error opening dest file: " << fn << "\n";
+            exit(1);
+        }
+        destFile << sourceFile.rdbuf();
+
+        if (!fs::remove(_tmp_expr_file)) {
+            std::cerr << _tmp_expr_file << " could not be deleted\n";
+            exit(1);
+        }
+
+        write_cache_index_line (uniq_id);
     }
 
-    path_map.insert({uniq_id, gen_expr_path()});
-    info_map.insert({path_map[uniq_id],*eb});
-    write_cache_index_line (uniq_id);
-
-
-
+    ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
+    ExprBlockInfo *ebi = new ExprBlockInfo(eb);
+    return ebi;
 }
 
 void ExprCache::read_cache()
@@ -161,11 +224,6 @@ void ExprCache::read_cache_index_line (std::string line) {
     }
     
     Assert (tokens.size()==n_cols, "Malformed index file");
-
-    // if (!(fs::exists(tokens[1]) && fs::is_directory(tokens[1]))) {
-    //     std::cerr << "Error: cache directory does not exist for " << tokens[1] << std::endl;
-    //     exit(1);
-    // }
 
     expr_path loc = to_expr_path(tokens[1]);
     Assert (!path_map.contains(tokens[0]), "duplicate expression in cache index");

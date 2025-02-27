@@ -29,18 +29,19 @@ typedef int expr_path;
 
 enum class MetricID {Delay};
 
+static const std::string _tmp_expr_file = "tmp_expr.act";
+
 class ExprCache : public ExternalExprOpt {
 public:
 
     ExprCache( const char *datapath_syntesis_tool,
                 const expr_mapping_target mapping_target,
                 const bool tie_cells,
-                const std::string expr_file_path = "",
-                const std::string exprid_prefix = "e",
-                const std::string block_prefix = "blk");
-                
+                const std::string expr_file_path = "");
+
+    ExprBlockInfo *synth_expr (int, int, Expr *, list_t *, iHashtable *, iHashtable *);
+
     void read_cache ();
-    void add_expr_to_cache (Expr *, list_t *, iHashtable *, ExprBlockInfo *);
     bool expr_in_cache (Expr *);
     ExprBlockInfo get_expr_info (Expr *);
     char *get_cache_loc ();
@@ -65,6 +66,8 @@ private:
     int area_id;
     int mapper_runtime_id;
     int io_runtime_id;
+
+    std::string _expr_file_path;
 
     int cache_counter;
 
