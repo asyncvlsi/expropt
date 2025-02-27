@@ -40,11 +40,11 @@ char *ExprCache::get_cache_loc()
     return getenv("ACT_SYNTH_CACHE");
 }
 
-ExprCache::ExprCache(const char *datapath_syntesis_tool,
+ExprCache::ExprCache(const char *datapath_synthesis_tool,
                      const expr_mapping_target mapping_target,
                      const bool tie_cells,
                      const std::string expr_file_path)
- :  ExternalExprOpt ( datapath_syntesis_tool,
+ :  ExternalExprOpt ( datapath_synthesis_tool,
                       mapping_target,
                       tie_cells,
                       _tmp_expr_file,

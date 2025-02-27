@@ -34,26 +34,24 @@ static const std::string _tmp_expr_file = "tmp_expr.act";
 class ExprCache : public ExternalExprOpt {
 public:
 
-    ExprCache( const char *datapath_syntesis_tool,
+    ExprCache( const char *datapath_synthesis_tool,
                 const expr_mapping_target mapping_target,
                 const bool tie_cells,
                 const std::string expr_file_path = "");
 
     ExprBlockInfo *synth_expr (int, int, Expr *, list_t *, iHashtable *, iHashtable *);
 
-    void read_cache ();
-    bool expr_in_cache (Expr *);
-    ExprBlockInfo get_expr_info (Expr *);
     char *get_cache_loc ();
 
 private:
 
+    void read_cache ();
     void read_cache_index_line (std::string);
     void write_cache_index_line (std::string);
 
     std::string _gen_unique_id (Expr *, list_t *, iHashtable *);
 
-    // gotta change this for different fodler name formats
+    // gotta change this for different folder name formats
     expr_path gen_expr_path () {
         return cache_counter++;
     }
