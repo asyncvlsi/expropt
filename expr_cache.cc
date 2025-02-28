@@ -181,27 +181,6 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
     if (path_map.contains(uniq_id)) {
         auto idx = path_map.at(uniq_id);
         Assert (info_map.contains(idx), "Could not find path to cached process.");
-        // read the cached defproc
-        Assert (fs::exists(path), "what");
-        std::string fn = path;
-        fn.append("/");
-        fn.append(std::to_string(idx));
-        fn.append(".act");
-
-        // append all contents of reqd. cache file to output expr file
-        int fd = lock_file(fn);
-        std::ifstream sourceFile(fn);
-        if (!sourceFile.is_open()) {
-            std::cerr << "Error opening source file: " << fn << "\n";
-            exit(1);
-        }
-        std::ofstream destFile(_expr_file_path, std::ios::app);
-        if (!destFile.is_open()) {
-            std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
-            exit(1);
-        }
-        destFile << sourceFile.rdbuf();
-        unlock_file(fd);
     }
     // gotta synth and add to cache
     else {
@@ -241,6 +220,28 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
 
         write_cache_index_line (uniq_id);
     }
+
+    // read the cached defproc
+    Assert (fs::exists(path), "what");
+    std::string fn = path;
+    fn.append("/");
+    fn.append(std::to_string(path_map.at(uniq_id)));
+    fn.append(".act");
+
+    // append all contents of reqd. cache file to output expr file
+    int fd = lock_file(fn);
+    std::ifstream sourceFile(fn);
+    if (!sourceFile.is_open()) {
+        std::cerr << "Error opening source file: " << fn << "\n";
+        exit(1);
+    }
+    std::ofstream destFile(_expr_file_path, std::ios::app);
+    if (!destFile.is_open()) {
+        std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
+        exit(1);
+    }
+    destFile << sourceFile.rdbuf();
+    unlock_file(fd);
 
     ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
     ExprBlockInfo *ebi = new ExprBlockInfo(eb);
