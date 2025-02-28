@@ -278,7 +278,7 @@ public:
 				   list_t *hidden_expr_name_list = NULL);
 
 
-private:
+protected:
 
   void _init_defaults(); 	//< initialize default parameters for
 				//< configuration, and read expropt.conf

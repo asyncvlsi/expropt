@@ -39,6 +39,8 @@ public:
                 const expr_mapping_target mapping_target,
                 const bool tie_cells,
                 const std::string expr_file_path = "");
+    
+    ~ExprCache();
 
     ExprBlockInfo *synth_expr (int, int, Expr *, list_t *, iHashtable *, iHashtable *);
 
@@ -49,6 +51,9 @@ private:
     void read_cache ();
     void read_cache_index_line (std::string);
     void write_cache_index_line (std::string);
+
+    int lock_file (std::string);
+    void unlock_file (int);
 
     std::string _gen_unique_id (Expr *, list_t *, iHashtable *);
 

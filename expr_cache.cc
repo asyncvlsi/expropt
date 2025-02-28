@@ -26,6 +26,9 @@
 #include <iostream>
 #include <sstream>
 #include "expr_cache.h"
+#include <sys/file.h>   
+#include <fcntl.h>    
+#include <unistd.h>    
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -38,6 +41,37 @@ char *ExprCache::get_cache_loc()
 {
     Assert (getenv("ACT_SYNTH_CACHE"), "Could not find cache location");
     return getenv("ACT_SYNTH_CACHE");
+}
+
+ExprCache::~ExprCache()
+{}
+
+int ExprCache::lock_file (std::string fn)
+{
+    int fd = open(fn.c_str(), O_RDWR | O_CREAT, 0666);
+    if (fd == -1) { 
+        std::cerr << "Failed to open " << fn << "\n"; 
+        exit(1); 
+    }
+    if (flock(fd, LOCK_EX) == -1) { 
+        std::cerr << "Failed to lock " << fn << "\n"; 
+        close(fd); 
+        exit(1); 
+    }
+    return fd;
+}
+
+void ExprCache::unlock_file (int fd)
+{
+    bool fail = false;
+    if (flock(fd, LOCK_UN) == -1) { 
+        std::cerr << "Failed to unlock descriptor: " << fd << "\n"; 
+        fail = true;
+    }
+    close(fd);
+    if (fail) {
+        exit(1);
+    }
 }
 
 ExprCache::ExprCache(bool invalidate_cache,
@@ -77,6 +111,9 @@ ExprCache::ExprCache(bool invalidate_cache,
 
     std::string index_filename = std::string(path) + std::string("/expr.index");
     if (!fs::exists(index_filename)) {
+
+        int fd = lock_file(index_filename);
+
         std::ofstream idx_file (index_filename.c_str(), std::ios::app);
         if (!idx_file) {
             std::cerr << "Error: could not create/open " << index_filename << std::endl;
@@ -89,6 +126,8 @@ ExprCache::ExprCache(bool invalidate_cache,
         idx_file << "# Type: <string> <int> <double (s)> <double (W)> <double (W)> <double (W)> <double (W)> <mapper_runtime (us)> <io_runtime (us)>" << std::endl;
         idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
         idx_file.close();
+
+        unlock_file(fd);
     }
     index_file = Strdup(index_filename.c_str());
     idx_file_delimiter = ' ';
@@ -150,6 +189,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
         fn.append(".act");
 
         // append all contents of reqd. cache file to output expr file
+        int fd = lock_file(fn);
         std::ifstream sourceFile(fn);
         if (!sourceFile.is_open()) {
             std::cerr << "Error opening source file: " << fn << "\n";
@@ -161,6 +201,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
             exit(1);
         }
         destFile << sourceFile.rdbuf();
+        unlock_file(fd);
     }
     // gotta synth and add to cache
     else {
@@ -184,6 +225,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
             std::cerr << "Error opening source file: " << _tmp_expr_file << "\n";
             exit(1);
         }
+        int fd = lock_file(fn);
         std::ofstream destFile(fn);
         if (!destFile.is_open()) {
             std::cerr << "Error opening dest file: " << fn << "\n";
@@ -195,6 +237,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
             std::cerr << _tmp_expr_file << " could not be deleted\n";
             exit(1);
         }
+        unlock_file(fd);
 
         write_cache_index_line (uniq_id);
     }
@@ -206,6 +249,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
 
 void ExprCache::read_cache()
 {
+    int fd = lock_file(index_file);
     std::ifstream idx_file(index_file);
     if (!idx_file.is_open()) {
         std::cerr << "Error: Could not open cache index file (" << index_file << ") for reading.\n";
@@ -221,6 +265,7 @@ void ExprCache::read_cache()
         read_cache_index_line(line);
         cache_counter++;
     }
+    unlock_file(fd);
 }
 
 void ExprCache::read_cache_index_line (std::string line) {
@@ -264,6 +309,7 @@ void ExprCache::read_cache_index_line (std::string line) {
 
 void ExprCache::write_cache_index_line (std::string uniq_id)
 {
+    int fd = lock_file(index_file);
     std::ofstream idx_file (index_file, std::ios::app);
 
     Assert (path_map.contains(uniq_id), "Expr not in cache");
@@ -283,4 +329,5 @@ void ExprCache::write_cache_index_line (std::string uniq_id)
     idx_file << std::endl;
 
     idx_file.close();
+    unlock_file(fd);
 }
