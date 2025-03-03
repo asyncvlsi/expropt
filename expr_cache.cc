@@ -1,7 +1,5 @@
 /*************************************************************************
  *
- *  This file is part of act expropt
- *
  *  Copyright (c) 2025 Karthi Srinivasan
  *
  *  This program is free software; you can redistribute it and/or
@@ -37,7 +35,7 @@ expr_path to_expr_path (std::string x) {
     return std::stoi(x);
 }
 
-char *ExprCache::get_cache_loc()
+std::string ExprCache::get_cache_loc()
 {
     if (config_exists("synth.expropt.cache.local")) {
         return config_get_string ("synth.expropt.cache.local");
@@ -100,7 +98,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
     config_set_default_string("synth.expropt.cache.cell_lib_namespace", "syn"); 
 
     if (invalidate_cache) {
-        Assert(path, "what");
+        Assert(!(path.empty()), "what");
         std::string del_files_cmd = std::string("rm ") + std::string(path) + std::string("/*.act");
         std::string del_index_cmd = std::string("rm ") + std::string(path) + std::string("/expr.index");
         system(del_files_cmd.c_str());
@@ -115,7 +113,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
         }
     }
 
-    std::string index_filename = std::string(path) + std::string("/expr.index");
+    std::string index_filename = path + std::string("/expr.index");
     if (!fs::exists(index_filename)) {
 
         int fd = lock_file(index_filename);
@@ -135,7 +133,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
 
         unlock_file(fd);
     }
-    index_file = Strdup(index_filename.c_str());
+    index_file = index_filename;
     idx_file_delimiter = ' ';
     path_map.clear();
 
@@ -170,10 +168,6 @@ std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable
     return uniq_id;
 }
 
-/*
-    top-level function - this is what you would call instead of 
-    run_external_opt for the expropt object
-*/
 ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
                                       int targetwidth,
                                       Expr *expr,

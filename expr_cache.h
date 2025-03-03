@@ -1,7 +1,5 @@
 /*************************************************************************
  *
- *  This file is part of act expropt
- *
  *  Copyright (c) 2025 Karthi Srinivasan
  *
  *  This program is free software; you can redistribute it and/or
@@ -25,9 +23,11 @@
 
 #include "expropt.h"
 
+/*
+    Path of an expression file within the cache.
+    int -> uses an integer as filename.
+*/
 typedef int expr_path;
-
-enum class MetricID {Delay};
 
 static const std::string _tmp_expr_file = "tmp_expr.act";
 static const std::string _cache_dummy_ns = "_cache_ns_";
@@ -42,9 +42,17 @@ public:
     
     ~ExprCache();
 
+    /*
+        Top-level function - This is what you would call instead of 
+        run_external_opt for the expropt object. 
+        Arguments are exactly the same.
+    */
     ExprBlockInfo *synth_expr (int, int, Expr *, list_t *, iHashtable *, iHashtable *);
 
-    char *get_cache_loc ();
+    /*
+        Get path to cache that is being used.
+    */
+    std::string get_cache_loc ();
 
 private:
 
@@ -58,13 +66,17 @@ private:
 
     std::string _gen_unique_id (Expr *, list_t *, iHashtable *);
 
-    // gotta change this for different folder name formats
+    /*
+        define a next() function for the
+        expr_path type.
+    */
     expr_path gen_expr_path () {
         return cache_counter++;
     }
 
-    char *path;
-    char *index_file;
+    std::string path;
+    std::string index_file;
+
     char idx_file_delimiter;
     int n_metrics;
     int n_cols;
@@ -74,7 +86,7 @@ private:
 
     std::string _expr_file_path;
 
-    int cache_counter;
+    expr_path cache_counter;
 
     // ID-to-path
     std::unordered_map<std::string, expr_path> path_map;
