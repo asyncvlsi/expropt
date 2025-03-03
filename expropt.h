@@ -75,17 +75,17 @@ public:
     // The difference between QDI and BD is just that the cells are
     // different.
     if (wire_encoding == qdi) {
-      cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
-      cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
-      expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
+      cell_act_file = config_get_string("synth.qdi.cell_lib");
+      cell_namespace = config_get_string("synth.qdi.cell_lib_namespace");
+      expr_channel_type = config_get_string("synth.qdi.cell_lib_wire_type");
     }
     else {
-      cell_act_file = config_get_string("expropt.act_cell_lib_bd");
-      cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
-      expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
+      cell_act_file = config_get_string("synth.bundled.cell_lib");
+      cell_namespace = config_get_string("synth.bundled.cell_lib_namespace");
+      expr_channel_type = config_get_string("synth.bundled.cell_lib_wire_type");
     }
     
-    _cleanup = config_get_int("expropt.clean_tmp_files");
+    _cleanup = config_get_int("synth.expropt.clean_tmp_files");
 
     _abc_api = NULL;
   }

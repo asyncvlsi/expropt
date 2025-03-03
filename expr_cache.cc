@@ -169,11 +169,11 @@ std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable
     run_external_opt for the expropt object
 */
 ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
-                                    int targetwidth,
-                                    Expr *expr,
-                                    list_t *in_expr_list,
-                                    iHashtable *in_expr_map,
-                                    iHashtable *in_width_map)
+                                      int targetwidth,
+                                      Expr *expr,
+                                      list_t *in_expr_list,
+                                      iHashtable *in_expr_map,
+                                      iHashtable *in_width_map)
 {
     std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map);
 
