@@ -39,8 +39,11 @@ expr_path to_expr_path (std::string x) {
 
 char *ExprCache::get_cache_loc()
 {
-    Assert (getenv("ACT_SYNTH_CACHE"), "Could not find cache location");
-    return getenv("ACT_SYNTH_CACHE");
+    if (config_exists("synth.expropt.cache.local")) {
+        return config_get_string ("synth.expropt.cache.local");
+    }
+    Assert (config_exists("synth.expropt.cache.global"), "Could not find global cache");
+    return config_get_string ("synth.expropt.cache.global");
 }
 
 ExprCache::~ExprCache()
@@ -74,8 +77,7 @@ void ExprCache::unlock_file (int fd)
     }
 }
 
-ExprCache::ExprCache(bool invalidate_cache,
-                     const char *datapath_synthesis_tool,
+ExprCache::ExprCache(const char *datapath_synthesis_tool,
                      const expr_mapping_target mapping_target,
                      const bool tie_cells,
                      const std::string expr_file_path
@@ -88,11 +90,15 @@ ExprCache::ExprCache(bool invalidate_cache,
                       "blk_") 
 {
     _expr_file_path = expr_file_path;
-    if (getenv("ACT_SYNTH_CACHE")==NULL) {
-        setenv("ACT_SYNTH_CACHE", (std::string(getenv("ACT_HOME"))+std::string("/cache")).c_str(), 1);
+    path = get_cache_loc();
+
+    bool invalidate_cache = false;
+    if (config_exists("synth.expropt.cache.invalidate")) {
+        invalidate_cache = (config_get_int("synth.expropt.cache.invalidate") != 0);
     }
-    path = getenv("ACT_SYNTH_CACHE");
-    
+
+    config_set_default_string("synth.expropt.cache.cell_lib_namespace", "syn"); 
+
     if (invalidate_cache) {
         Assert(path, "what");
         std::string del_files_cmd = std::string("rm ") + std::string(path) + std::string("/*.act");
@@ -184,7 +190,11 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
     }
     // gotta synth and add to cache
     else {
+        // set namespace to cache namespace
+        set_namespace( config_get_string("synth.expropt.cache.cell_lib_namespace") );
         ExprBlockInfo *ebi = run_external_opt(expr_set_number, targetwidth, expr, in_expr_list, in_expr_map, in_width_map);
+        reset_namespace();
+
         auto idx = gen_expr_path();
         path_map.insert({uniq_id, idx});
         Assert (!info_map.contains(idx), "cache identifier conflict");
@@ -210,7 +220,8 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
             std::cerr << "Error opening dest file: " << fn << "\n";
             exit(1);
         }
-        destFile << sourceFile.rdbuf();
+
+        rename_and_pipe(sourceFile, destFile, config_get_string("synth.expropt.cache.cell_lib_namespace"), _cache_dummy_ns);
 
         if (!fs::remove(_tmp_expr_file)) {
             std::cerr << _tmp_expr_file << " could not be deleted\n";
@@ -240,12 +251,31 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
         std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
         exit(1);
     }
-    destFile << sourceFile.rdbuf();
+
+    rename_and_pipe(sourceFile, destFile, _cache_dummy_ns, cell_namespace);
     unlock_file(fd);
 
     ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
     ExprBlockInfo *ebi = new ExprBlockInfo(eb);
     return ebi;
+}
+
+void ExprCache::rename_and_pipe (std::ifstream &src, 
+                                 std::ofstream &dst,
+                                 const std::string sfind,
+                                 const std::string sreplace)
+{
+    std::string line;
+    while (std::getline(src, line)) 
+    {
+        std::size_t pos = 0;
+        while ((pos = line.find(sfind, pos)) != std::string::npos) 
+        {
+            line.replace(pos, sfind.size(), sreplace);
+            pos += sreplace.size();
+        }
+        dst << line << "\n";
+    }
 }
 
 void ExprCache::read_cache()

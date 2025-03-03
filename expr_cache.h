@@ -30,12 +30,12 @@ typedef int expr_path;
 enum class MetricID {Delay};
 
 static const std::string _tmp_expr_file = "tmp_expr.act";
+static const std::string _cache_dummy_ns = "_cache_ns_";
 
 class ExprCache : public ExternalExprOpt {
 public:
 
-    ExprCache( bool invalidate_cache, 
-                const char *datapath_synthesis_tool,
+    ExprCache(  const char *datapath_synthesis_tool,
                 const expr_mapping_target mapping_target,
                 const bool tie_cells,
                 const std::string expr_file_path = "");
@@ -51,6 +51,7 @@ private:
     void read_cache ();
     void read_cache_index_line (std::string);
     void write_cache_index_line (std::string);
+    void rename_and_pipe (std::ifstream &, std::ofstream &, const std::string, const std::string);
 
     int lock_file (std::string);
     void unlock_file (int);

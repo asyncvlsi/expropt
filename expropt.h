@@ -84,6 +84,8 @@ public:
       cell_namespace = config_get_string("synth.bundled.cell_lib_namespace");
       expr_channel_type = config_get_string("synth.bundled.cell_lib_wire_type");
     }
+
+    cell_namespace_save = cell_namespace;
     
     _cleanup = config_get_int("synth.expropt.clean_tmp_files");
 
@@ -343,6 +345,10 @@ protected:
      * the default is "syn"
      */
     std::string cell_namespace;
+    std::string cell_namespace_save;
+
+    void set_namespace(std::string s) { cell_namespace = s; }
+    void reset_namespace() { cell_namespace = cell_namespace_save; }
 
     /**
      * what wire type is used in v2act, if bool is chosen v2act will act in sync mode for all other it runs in async mode.
