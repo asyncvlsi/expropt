@@ -89,9 +89,9 @@ void ExternalExprOpt::_init_defaults ()
   config_set_default_string ("expropt.lef", "none");
 
   // .lib files for other corners; omitted by default
-  config_set_default_string ("synth.liberty_ff_hightemp", "none");
-  config_set_default_string ("synth.liberty_ff_lowtemp", "none");
-  config_set_default_string ("synth.liberty_ss_hightemp", "none");
+  config_set_default_string ("synth.liberty.max_power", "none");
+  config_set_default_string ("synth.liberty.min_delay", "none");
+  config_set_default_string ("synth.liberty.max_delay", "none");
 
   // default load cap
   config_set_default_real ("synth.expropt.default_load", 1.0);
@@ -397,9 +397,9 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   syn.use_tie_cells = use_tie_cells;
   syn.space = NULL;
   
-  configreturn = config_get_string("synth.liberty_tt_typtemp");
+  configreturn = config_get_string("synth.liberty.typical");
   if (strcmp (configreturn, "none") == 0) {
-    fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
+    fatal_error("please define \"liberty.typical\" in synthesis configuration file 2");
   }
 
   if (strcmp (mapper, "abc") == 0) {

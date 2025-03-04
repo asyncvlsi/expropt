@@ -301,7 +301,7 @@ bool AbcApi::_startsession(char *args)
   snprintf (buf, 1024, "%%read %s; %%blast; &put", _vin);
   if (!_run_abc (buf)) return false;
 
-  char *lib = config_get_string("synth.liberty_tt_typtemp");
+  char *lib = config_get_string("synth.liberty.typical");
   snprintf (buf, 1024, "read_lib -v %s", lib);
   if (!_run_abc (buf)) return false;
 

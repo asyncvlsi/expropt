@@ -183,7 +183,7 @@ bool yosys_run (act_syn_info *s)
   fclose (fp);
 
   // yosys gets its script passed via stdin (very short)
-  char *libfile = config_get_string("synth.liberty_tt_typtemp");
+  char *libfile = config_get_string("synth.liberty.typical");
 
   char cmd[10240];
   
@@ -227,7 +227,7 @@ bool yosys_run (act_syn_info *s)
 	     s->v_out, s->v_out);
   }
   else {
-    fatal_error("Please define \"liberty_tt_typtemp\" in expropt configuration file");
+    fatal_error("Please define \"liberty.typical\" in expropt configuration file");
   }
 
   FREE (sdc_file);
