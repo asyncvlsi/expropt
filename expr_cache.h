@@ -21,7 +21,7 @@
  */
 #pragma once
 
-#include "expropt.h"
+#include <act/expropt.h>
 
 /*
     Path of an expression file within the cache.

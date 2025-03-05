@@ -25,7 +25,7 @@
 #include <regex>
 #include <fstream>
 #include <unordered_map>
-#include "expr_info.h"
+#include <act/expr_info.h>
 
 /**
  * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
