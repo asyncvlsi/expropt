@@ -179,19 +179,19 @@ bool yosys_run (act_syn_info *s)
   if (!fp) {
     fatal_error ("Could not open `%s' file!", sdc_file);
   }
-  fprintf (fp, "set_load %g\n", config_get_real ("expropt.default_load"));
+  fprintf (fp, "set_load %g\n", config_get_real ("synth.expropt.default_load"));
   fclose (fp);
 
   // yosys gets its script passed via stdin (very short)
-  char *libfile = config_get_string("expropt.liberty_tt_typtemp");
+  char *libfile = config_get_string("synth.liberty.typical");
 
   char cmd[10240];
   
   if (strcmp(libfile,"none") != 0) {
     int constr = 0;
     int pos;
-    if (config_exists ("expropt.abc_use_constraints")) {
-      if (config_get_int ("expropt.abc_use_constraints") == 1) {
+    if (config_exists ("expropt.abc.use_constraints")) {
+      if (config_get_int ("expropt.abc.use_constraints") == 1) {
 	constr = 1;
       }
     }
@@ -227,15 +227,15 @@ bool yosys_run (act_syn_info *s)
 	     s->v_out, s->v_out);
   }
   else {
-    fatal_error("Please define \"liberty_tt_typtemp\" in expropt configuration file");
+    fatal_error("Please define \"liberty.typical\" in expropt configuration file");
   }
 
   FREE (sdc_file);
   
-  if (config_get_int("expropt.verbose") == 2) {
+  if (config_get_int("synth.expropt.verbose") == 2) {
     printf("running: %s \n", cmd);
   }
-  else if (config_get_int("expropt.verbose") == 1) {
+  else if (config_get_int("synth.expropt.verbose") == 1) {
     printf(".");
     fflush(stdout);
   }
@@ -256,8 +256,8 @@ double yosys_get_metric (act_syn_info *s, expropt_metadata type)
 
     res = parse_yosys_info (s->v_out, &area);
     if (type == metadata_area) {
-      if (!config_exists ("expropt.abc_use_constraints") ||
-	  !(config_get_int ("expropt.abc_use_constraints") == 1)) {
+      if (!config_exists ("expropt.abc.use_constraints") ||
+	  !(config_get_int ("expropt.abc.use_constraints") == 1)) {
 	return -1.0;
       }
       return area;
@@ -286,10 +286,10 @@ void yosys_cleanup (act_syn_info *s)
   snprintf(cmd, 4096, "rm %s && rm %s && rm %s && rm %s.* ",
 	   s->v_out, s->v_in, sdc_file, s->v_out);
 
-  if (config_get_int("expropt.verbose") == 2) {
+  if (config_get_int("synth.expropt.verbose") == 2) {
     printf("running: %s \n", cmd);
   }
-  else if (config_get_int("expropt.verbose") == 1) {
+  else if (config_get_int("synth.expropt.verbose") == 1) {
     printf(".");
     fflush(stdout);
   }

@@ -26,13 +26,15 @@ TARGETLIBS=$(LIB) $(SHLIB) \
 	act_extsyn_yosys.so \
 	act_extsyn_abc.so
 
-TARGETINCS=expropt.h
+TARGETINCS=expr_cache.h expropt.h expr_info.h
 
 TARGETINCSUBDIR=act
 
 TARGETCONF=expropt.conf
 
-OBJS2=expropt.o verilog.o abc_api.o
+CPPSTD=c++20
+
+OBJS2=expr_cache.o expropt.o verilog.o abc_api.o 
 
 OBJS= $(OBJS2)
 

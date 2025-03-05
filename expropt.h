@@ -21,133 +21,11 @@
 #ifndef __EXPR_OPT_H__
 #define __EXPR_OPT_H__
 
-#include <act/act.h>
 #include <string>
 #include <regex>
 #include <fstream>
 #include <unordered_map>
-
-/**
- * enum for referencing the pass type
- */
-enum expr_mapping_target {
-        qdi = 0,
-        bd = 1,
-};
-
-/**
- * the metadata object holds all extracted points of the expr set.
- */
-
-struct metric_triplet {
-  metric_triplet() {
-    typ_val = 0;
-    min_val = 0;
-    max_val = 0;
-    found = false;
-  }
-  
-  /* Metrics typically have a range: typical value, min value, and max
-     value.
-  */
-  double typ_val, min_val, max_val;
-  bool found;
-  
-  bool exists() { return found; }
-
-  void set_typ_only(double v) {
-    min_val = v;
-    typ_val = v;
-    max_val = v;
-    found = true;
-  }
-  void set_metrics(double v_min, double v_typ, double v_max) {
-    min_val = v_min;
-    typ_val = v_typ;
-    max_val = v_max;
-    found = true;
-  }
-};
-
-enum expropt_metadata {
-  metadata_area = 0,
-  metadata_delay_typ = 1,
-  metadata_power_typ = 2,
-  metadata_delay_max = 3,
-  metadata_delay_min = 4,
-  metadata_power_typ_static = 5,
-  metadata_power_typ_dynamic = 6,
-  metadata_power_max = 7,
-  metadata_power_max_static = 8,
-  metadata_power_max_dynamic = 9
-};
-
-struct act_syn_info {
-  const char *v_in;
-  const char *v_out;
-  const char *toplevel;
-  bool use_tie_cells;
-  void *space;			// use for whatever you want!
-};
-
-class ExprBlockInfo {
-private:
-  metric_triplet delay;		//< delay value (s)
-  metric_triplet static_power;	//< power value (W)
-  metric_triplet dynamic_power; //<  power value (W)
-  metric_triplet total_power;	//<  total power (W)
-  long long mapper_runtime; //<  logic synthesis tool runtime (us)
-  long long interface_runtime; //< interface tools (verilog_printing + v2act) runtime (us)
-
-  /**
-   * the theoretical area of all gates combined, with 100% utiliasation.
-   * 0 if not extracted.
-   */
-  double area;
-
-public:
-
-  metric_triplet getDelay() { return delay; }
-  metric_triplet getStaticPower() { return static_power; }
-  metric_triplet getDynamicPower() { return dynamic_power; }
-  metric_triplet getPower() { return total_power; }
-  double getArea() { return area; }
-  long long getRuntime() { return mapper_runtime; }
-  long long getIORuntime() { return interface_runtime; }
-
-  /**
-   * Construct a new Expr Block Info object, values can not be changed after creation.
-   * 
-   * parameter see getter descriptions.
-   */
-  ExprBlockInfo(const metric_triplet e_delay,
-		const metric_triplet e_power,
-		const metric_triplet e_static_power,
-		const metric_triplet e_dynamic_power,
-		const double e_area,
-    const long long e_runtime,
-    const long long e_io_runtime) :
-    delay{e_delay},
-    total_power{e_power},
-    static_power{e_static_power},
-    dynamic_power{e_dynamic_power},
-    area{e_area},
-    mapper_runtime{e_runtime},
-    interface_runtime{e_io_runtime}
-  { }
-                    
-  /**
-   * Construct a new Expr Block dummy with no extration results =>
-   * all 0, but area = -1 to indicate that the results were not
-   * created.
-   */
-  ExprBlockInfo() : area{-1} { };
-  
-  ~ExprBlockInfo() { }
-
-  bool exists() { return area == -1 ? false : true; }
-};
-
+#include <act/expr_info.h>
 
 /**
  * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
@@ -197,17 +75,19 @@ public:
     // The difference between QDI and BD is just that the cells are
     // different.
     if (wire_encoding == qdi) {
-      cell_act_file = config_get_string("expropt.act_cell_lib_qdi");
-      cell_namespace = config_get_string("expropt.act_cell_lib_qdi_namespace");
-      expr_channel_type = config_get_string("expropt.act_cell_lib_qdi_wire_type");
+      cell_act_file = config_get_string("synth.qdi.cell_lib");
+      cell_namespace = config_get_string("synth.qdi.cell_lib_namespace");
+      expr_channel_type = config_get_string("synth.qdi.cell_lib_wire_type");
     }
     else {
-      cell_act_file = config_get_string("expropt.act_cell_lib_bd");
-      cell_namespace = config_get_string("expropt.act_cell_lib_bd_namespace");
-      expr_channel_type = config_get_string("expropt.act_cell_lib_bd_wire_type");
+      cell_act_file = config_get_string("synth.bundled.cell_lib");
+      cell_namespace = config_get_string("synth.bundled.cell_lib_namespace");
+      expr_channel_type = config_get_string("synth.bundled.cell_lib_wire_type");
     }
+
+    cell_namespace_save = cell_namespace;
     
-    _cleanup = config_get_int("expropt.clean_tmp_files");
+    _cleanup = config_get_int("synth.expropt.clean_tmp_files");
 
     _abc_api = NULL;
   }
@@ -400,7 +280,7 @@ public:
 				   list_t *hidden_expr_name_list = NULL);
 
 
-private:
+protected:
 
   void _init_defaults(); 	//< initialize default parameters for
 				//< configuration, and read expropt.conf
@@ -465,6 +345,10 @@ private:
      * the default is "syn"
      */
     std::string cell_namespace;
+    std::string cell_namespace_save;
+
+    void set_namespace(std::string s) { cell_namespace = s; }
+    void reset_namespace() { cell_namespace = cell_namespace_save; }
 
     /**
      * what wire type is used in v2act, if bool is chosen v2act will act in sync mode for all other it runs in async mode.

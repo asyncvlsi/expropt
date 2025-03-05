@@ -20,13 +20,7 @@
  **************************************************************************/
 
 #include "expropt.h"
-#include <act/types.h>
-#include <common/int.h>
-#include <string.h>
 #include "abc_api.h"
-#include <dlfcn.h>
-#include <chrono>
-using namespace std::chrono;
 
 #define VERILOG_FILE_PREFIX "exprop_"
 #define MAPPED_FILE_SUFFIX "_mapped"
@@ -71,38 +65,36 @@ bool ExternalExprOpt::engineExists (const char *s)
 void ExternalExprOpt::_init_defaults ()
 {
   // clear tmp files by default
-  config_set_default_int ("expropt.clean_tmp_files", 1);
+  config_set_default_int ("synth.expropt.clean_tmp_files", 1);
 
   // do not vectorize all ports; single entry ports are bools, while
   // ports with an array of bits are arrays
-  config_set_default_int ("expropt.vectorize_all_ports", 0);
+  config_set_default_int ("synth.expropt.vectorize_all_ports", 0);
 
   // verbosity level. 1 = display dots
-  config_set_default_int ("expropt.verbose", 1);
+  config_set_default_int ("synth.expropt.verbose", 1);
 
   // namespace for the cell library for qdi and bundled data datapaths
-  config_set_default_string ("expropt.act_cell_lib_qdi_namespace", "syn");
-  config_set_default_string ("expropt.act_cell_lib_bd_namespace", "syn");
+  config_set_default_string ("synth.qdi.cell_lib_namespace", "syn");
+  config_set_default_string ("synth.bundled.cell_lib_namespace", "syn");
 
   // core type for a bit in qdi v/s bundled data
-  config_set_default_string ("expropt.act_cell_lib_qdi_wire_type",
-			     "sdtexprchan<1>");
-  
-  config_set_default_string ("expropt.act_cell_lib_bd_wire_type", "bool");
+  config_set_default_string ("synth.qdi.cell_lib_wire_type", "sdtexprchan<1>");
+  config_set_default_string ("synth.bundled.cell_lib_wire_type", "bool");
   
   // capacitance table for the technology
-  config_set_default_string ("expropt.captable", "none");
+  config_set_default_string ("synth.expropt.captable", "none");
 
   // LEF files
   config_set_default_string ("expropt.lef", "none");
 
   // .lib files for other corners; omitted by default
-  config_set_default_string ("expropt.liberty_ff_hightemp", "none");
-  config_set_default_string ("expropt.liberty_ff_lowtemp", "none");
-  config_set_default_string ("expropt.liberty_ss_hightemp", "none");
+  config_set_default_string ("synth.liberty.max_power", "none");
+  config_set_default_string ("synth.liberty.min_delay", "none");
+  config_set_default_string ("synth.liberty.max_delay", "none");
 
   // default load cap
-  config_set_default_real ("expropt.default_load", 1.0);
+  config_set_default_real ("synth.expropt.default_load", 1.0);
 
   config_read("expropt.conf");
 
@@ -405,9 +397,9 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   syn.use_tie_cells = use_tie_cells;
   syn.space = NULL;
   
-  configreturn = config_get_string("expropt.liberty_tt_typtemp");
+  configreturn = config_get_string("synth.liberty.typical");
   if (strcmp (configreturn, "none") == 0) {
-    fatal_error("please define \"liberty_tt_typtemp\" in expropt configuration file");
+    fatal_error("please define \"liberty.typical\" in synthesis configuration file 2");
   }
 
   if (strcmp (mapper, "abc") == 0) {
@@ -456,10 +448,10 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
       }
     }
     
-    if (config_get_int("expropt.verbose") == 2) {
+    if (config_get_int("synth.expropt.verbose") == 2) {
       printf("running: %s \n",cmd);
     }
-    else if (config_get_int("expropt.verbose") == 1) {
+    else if (config_get_int("synth.expropt.verbose") == 1) {
       printf(".");
       fflush(stdout);
     }
@@ -527,6 +519,6 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   if (_cleanup) {
     (*_syn_cleanup) (&syn);
   }
-  
+
   return info;
 }

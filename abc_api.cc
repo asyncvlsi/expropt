@@ -301,13 +301,13 @@ bool AbcApi::_startsession(char *args)
   snprintf (buf, 1024, "%%read %s; %%blast; &put", _vin);
   if (!_run_abc (buf)) return false;
 
-  char *lib = config_get_string("expropt.liberty_tt_typtemp");
+  char *lib = config_get_string("synth.liberty.typical");
   snprintf (buf, 1024, "read_lib -v %s", lib);
   if (!_run_abc (buf)) return false;
 
   int constr = 0;
-  if (config_exists ("expropt.abc_use_constraints")) {
-    if (config_get_int ("expropt.abc_use_constraints") == 1) {
+  if (config_exists ("synth.expropt.abc.use_constraints")) {
+    if (config_get_int ("synth.expropt.abc.use_constraints") == 1) {
       constr = 1;
     }
   }
@@ -663,7 +663,7 @@ bool AbcApi::_endsession()
   }
   fprintf (vfp, ");\n");
 
-  int vectorize = (config_get_int("expropt.vectorize_all_ports") == 0) ? 0 : 1;
+  int vectorize = (config_get_int("synth.expropt.vectorize_all_ports") == 0) ? 0 : 1;
 
   for (listitem_t *li = list_first (iports); li; li = list_next (li)) {
     char *v = (char *) list_value (li);
