@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <sstream>
+#include "abc_api.h"
 #include "expr_cache.h"
 #include <sys/file.h>   
 #include <fcntl.h>    
@@ -45,7 +46,12 @@ std::string ExprCache::get_cache_loc()
 }
 
 ExprCache::~ExprCache()
-{}
+{
+  if (_syn_dlib) {
+    dlclose (_syn_dlib);
+    _syn_dlib = NULL;
+  }
+}
 
 int ExprCache::lock_file (std::string fn)
 {
@@ -95,7 +101,10 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
         invalidate_cache = (config_get_int("synth.expropt.cache.invalidate") != 0);
     }
 
-    config_set_default_string("synth.expropt.cache.cell_lib_namespace", "syn"); 
+    config_set_default_string("synth.expropt.cache.cell_lib_namespace", "syn");
+    
+    // things to find and replace when storing in cache
+    // just store the verilog file
 
     if (invalidate_cache) {
         Assert(!(path.empty()), "what");
@@ -143,7 +152,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
     mapper_runtime_id = 2 + (3*n_metrics) + 1;
     io_runtime_id = 2 + (3*n_metrics) + 2;
 
-    // id, dirname, 3 numbers for each metric (typ, min, max), area, mapper runtime, io runtime
+    // id, filename, 3 numbers for each metric (typ, min, max), area, mapper runtime, io runtime
     n_cols = 2 + (3*n_metrics) + 1 + 2;
 
     // initialize cache counter
@@ -184,10 +193,9 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
     }
     // gotta synth and add to cache
     else {
-        // set namespace to cache namespace
-        set_namespace( config_get_string("synth.expropt.cache.cell_lib_namespace") );
-        ExprBlockInfo *ebi = run_external_opt(expr_set_number, targetwidth, expr, in_expr_list, in_expr_map, in_width_map);
-        reset_namespace();
+        ExprBlockInfo *ebi = run_external_opt(expr_set_number, targetwidth, expr, 
+                                in_expr_list, in_expr_map, in_width_map, false);
+        auto verilogfile = ebi->getMappedFile();
 
         auto idx = gen_expr_path();
         path_map.insert({uniq_id, idx});
@@ -199,13 +207,13 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
         std::string fn = path;
         fn.append("/");
         fn.append(std::to_string(idx));
-        fn.append(".act");
+        fn.append(".v");
         Assert (!fs::exists(fn), "cache file already exists?");
 
-        // append all contents of tmp expr file to cache file
-        std::ifstream sourceFile(_tmp_expr_file);
+        // append all contents of tmp verilog file to cache file
+        std::ifstream sourceFile(verilogfile);
         if (!sourceFile.is_open()) {
-            std::cerr << "Error opening source file: " << _tmp_expr_file << "\n";
+            std::cerr << "Error opening source file: " << verilogfile << "\n";
             exit(1);
         }
         int fd = lock_file(fn);
@@ -215,14 +223,15 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
             exit(1);
         }
 
-        rename_and_pipe(sourceFile, destFile, config_get_string("synth.expropt.cache.cell_lib_namespace"), _cache_dummy_ns);
+        rename_and_pipe(sourceFile, destFile, {}, {});
 
-        if (!fs::remove(_tmp_expr_file)) {
-            std::cerr << _tmp_expr_file << " could not be deleted\n";
+        if (!fs::remove(verilogfile)) {
+            std::cerr << verilogfile << " could not be deleted\n";
             exit(1);
         }
         unlock_file(fd);
 
+        cleanup_tmp_files();
         write_cache_index_line (uniq_id);
     }
 
@@ -231,7 +240,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
     std::string fn = path;
     fn.append("/");
     fn.append(std::to_string(path_map.at(uniq_id)));
-    fn.append(".act");
+    fn.append(".v");
 
     // append all contents of reqd. cache file to output expr file
     int fd = lock_file(fn);
@@ -246,7 +255,8 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
         exit(1);
     }
 
-    rename_and_pipe(sourceFile, destFile, _cache_dummy_ns, cell_namespace);
+    std::chrono::microseconds dummy;
+    backend(fn, dummy, dummy);
     unlock_file(fd);
 
     ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
@@ -254,19 +264,28 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
     return ebi;
 }
 
+void ExprCache::v2act_and_pipe (std::ifstream &src, 
+                                 std::ofstream &dst)
+{
+}
+
 void ExprCache::rename_and_pipe (std::ifstream &src, 
                                  std::ofstream &dst,
-                                 const std::string sfind,
-                                 const std::string sreplace)
+                                 const std::vector<std::string> sfinds,
+                                 const std::vector<std::string> sreplaces)
 {
     std::string line;
     while (std::getline(src, line)) 
     {
-        std::size_t pos = 0;
-        while ((pos = line.find(sfind, pos)) != std::string::npos) 
-        {
-            line.replace(pos, sfind.size(), sreplace);
-            pos += sreplace.size();
+        for ( int i=0; i<sfinds.size(); i++ ) {
+            std::size_t pos = 0;
+            auto sfind = sfinds.at(i);
+            auto sreplace = sreplaces.at(i);
+            while ((pos = line.find(sfind, pos)) != std::string::npos) 
+            {
+                line.replace(pos, sfind.size(), sreplace);
+                pos += sreplace.size();
+            }
         }
         dst << line << "\n";
     }
@@ -296,7 +315,7 @@ void ExprCache::read_cache()
 void ExprCache::read_cache_index_line (std::string line) {
     std::istringstream ss(line);
 
-    std::vector<std::string> tokens;
+    std::vector<std::string> tokens = {};
     std::string token;
     
     while (std::getline(ss, token, idx_file_delimiter)) {
@@ -327,7 +346,7 @@ void ExprCache::read_cache_index_line (std::string line) {
     double mapper_runtime = std::stod(tokens[mapper_runtime_id]);
     double io_runtime = std::stod(tokens[io_runtime_id]);
 
-    ExprBlockInfo eb (del, pow, st_pow, dyn_pow, area, mapper_runtime, io_runtime);
+    ExprBlockInfo eb (del, pow, st_pow, dyn_pow, area, mapper_runtime, io_runtime, std::to_string(loc)+".v");
     Assert (!info_map.contains(loc), "duplicate data in cache index file");
     info_map.insert({loc, eb});
 }

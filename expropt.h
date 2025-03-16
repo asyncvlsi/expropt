@@ -25,7 +25,8 @@
 #include <regex>
 #include <fstream>
 #include <unordered_map>
-#include <act/expr_info.h>
+// #include <act/expr_info.h>
+#include "expr_info.h"
 
 /**
  * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
@@ -177,7 +178,8 @@ public:
 				   Expr *e,
 				   list_t *in_expr_list,
 				   iHashtable *in_expr_map,
-				   iHashtable *in_width_map);
+				   iHashtable *in_width_map,
+           bool run_backend = true);
 
   /**
    * Simple C-STRING MODE - set of expr - recomended mode - outputs are
@@ -225,7 +227,8 @@ public:
 				   list_t *out_expr_list,
 				   iHashtable *out_expr_map,
 				   iHashtable *out_width_map,
-				   list_t *hidden_expr_list = NULL);
+				   list_t *hidden_expr_list = NULL,
+           bool run_backend = true);
 
   
   /**
@@ -277,7 +280,8 @@ public:
 				   list_t *out_expr_name_list,
 				   iHashtable *out_width_map,
 				   list_t *hidden_expr_list = NULL,
-				   list_t *hidden_expr_name_list = NULL);
+				   list_t *hidden_expr_name_list = NULL,
+           bool run_backend = true);
 
 
 protected:
@@ -287,6 +291,12 @@ protected:
 				//< to override any of the defaults.
 
   bool _cleanup;
+  void cleanup_tmp_files();
+
+  act_syn_info __syn;
+
+  void run_v2act(std::string, bool);
+  ExprBlockInfo *backend(std::string, std::chrono::microseconds, std::chrono::microseconds);
   
   /**
    * print the verilog module, internal takes the inputs and outputs as lists of expressions (plus the properites name and width as maps). 
