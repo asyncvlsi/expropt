@@ -160,7 +160,8 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
     read_cache();
 }
 
-std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable *width_map)
+std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, 
+                        iHashtable *width_map, int outwidth)
 {
     list_t *vars = list_new();
     act_expr_collect_ids (vars, e);
@@ -174,6 +175,8 @@ std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, iHashtable
         uniq_id.append("_");
         uniq_id.append(std::to_string(width));
     }
+    uniq_id.append("_");
+    uniq_id.append(std::to_string(outwidth));
     return uniq_id;
 }
 
@@ -184,7 +187,7 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
                                       iHashtable *in_expr_map,
                                       iHashtable *in_width_map)
 {
-    std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map);
+    std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map, targetwidth);
 
     // already have it
     if (path_map.contains(uniq_id)) {

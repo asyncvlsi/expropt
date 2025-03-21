@@ -68,7 +68,7 @@ private:
     int lock_file (std::string);
     void unlock_file (int);
 
-    std::string _gen_unique_id (Expr *, list_t *, iHashtable *);
+    std::string _gen_unique_id (Expr *, list_t *, iHashtable *, int);
 
     /*
         define a next() function for the
