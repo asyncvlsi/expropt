@@ -146,7 +146,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
 						  Expr *expr,
 						  list_t *in_expr_list,
 						  iHashtable *in_expr_map,
-						  iHashtable *in_width_map)
+						  iHashtable *in_width_map,
+              bool __cleanup)
 {
   // build the data structures needed
 
@@ -198,7 +199,9 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
 			  in_width_map,
 			  outlist,
 			  outexprmap,
-			  outwidthmap);
+			  outwidthmap,
+        NULL,
+        __cleanup);
 
   // after completerion clean up memory, the generated char names will
   // leak they are not cleaned up atm.
@@ -238,7 +241,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 						  list_t *out_expr_list,
 						  iHashtable *out_expr_map,
 						  iHashtable *out_width_map,
-						  list_t *hidden_expr_list)
+						  list_t *hidden_expr_list,
+              bool __cleanup)
 {
   //build the data structures need
   ExprBlockInfo* info;
@@ -274,7 +278,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 			  out_name_list,
 			  out_width_map,
 			  hidden_expr_list,
-			  hidden_name_list);
+			  hidden_name_list,
+        __cleanup);
   
   list_free(out_name_list);
   list_free(hidden_name_list);
@@ -299,7 +304,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 						  list_t *out_expr_name_list,
 						  iHashtable *out_width_map,
 						  list_t *hidden_expr_list,
-						  list_t *hidden_expr_name_list)
+						  list_t *hidden_expr_name_list,
+              bool __cleanup)
 {
   ExprBlockInfo* info = NULL;
 
@@ -330,7 +336,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   mapped_file.append(".v");
   verilog_file.append(".v");
   
-  char cmd[4096] = "";
+  // char cmd[4096] = "";
   FILE *verilog_stream;
 
   std::string sdc_file = "./";
@@ -390,12 +396,11 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   */
 
   // parameters to be passed to the logic synthesis engine 
-  act_syn_info syn;
-  syn.v_in = verilog_file.c_str();
-  syn.v_out = mapped_file.c_str();
-  syn.toplevel = expr_set_name;
-  syn.use_tie_cells = use_tie_cells;
-  syn.space = NULL;
+  __syn.v_in = verilog_file.c_str();
+  __syn.v_out = mapped_file.c_str();
+  __syn.toplevel = expr_set_name;
+  __syn.use_tie_cells = use_tie_cells;
+  __syn.space = NULL;
   
   configreturn = config_get_string("synth.liberty.typical");
   if (strcmp (configreturn, "none") == 0) {
@@ -407,69 +412,40 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
     if (!_abc_api) {
       _abc_api = new AbcApi ();
     }
-    syn.space  = _abc_api;
+    __syn.space  = _abc_api;
   }
   
   auto start_mapper = high_resolution_clock::now();
-  if (!(*_syn_run) (&syn)) {
+  if (!(*_syn_run) (&__syn)) {
     fatal_error ("Synthesis %s failed.", mapper);
   }
   auto stop_mapper = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop_mapper - start_mapper);
+  auto ebi = backend(mapped_file, io_duration, duration);
+  if (__cleanup) cleanup_tmp_files();
+  return ebi;
+}
 
+ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
+                                std::chrono::microseconds io_duration,
+                                std::chrono::microseconds duration)
+{
   // read the resulting netlist and map it back to act, if the
   // wire_type is not bool use the async mode the specify a wire type
   // as a channel.  skip if run was just for extraction of properties
   // => output filename empty
   if (!expr_output_file.empty()) {
-    if (wire_encoding == qdi) {
-      // QDI, so we don't add tie cells
-      snprintf(cmd, 4096, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
-	       expr_channel_type.data(),
-	       cell_act_file.data(),
-	       cell_namespace.data(),
-	       mapped_file.data(),
-	       expr_output_file.data());
-    }
-    else {
-      if (!(syn.use_tie_cells)) {
-        snprintf(cmd, 4096, "v2act -t -l %s -n %s %s >> %s",
-          cell_act_file.data(),
-          cell_namespace.data(),
-          mapped_file.data(),
-          expr_output_file.data());
-      }
-      else {
-        snprintf(cmd, 4096, "v2act -l %s -n %s %s >> %s",
-          cell_act_file.data(),
-          cell_namespace.data(),
-          mapped_file.data(),
-          expr_output_file.data());
-      }
-    }
-    
-    if (config_get_int("synth.expropt.verbose") == 2) {
-      printf("running: %s \n",cmd);
-    }
-    else if (config_get_int("synth.expropt.verbose") == 1) {
-      printf(".");
-      fflush(stdout);
-    }
-    
     auto start_v2act = high_resolution_clock::now();
-    exec_failure = system(cmd);
+    run_v2act(_mapped_file, __syn.use_tie_cells);
     auto stop_v2act = high_resolution_clock::now();
     io_duration += duration_cast<microseconds>(stop_v2act - start_v2act);
-    if (exec_failure != 0) {
-      fatal_error("external program call \"%s\" failed.", cmd);
-    }
   }
   
-  // parce block info - WORK IN PROGRESS
+  // parse block info - WORK IN PROGRESS
   metric_triplet delay, static_power, dynamic_power, total_power;
   double area = 0.0;
 
-  area = (*_syn_get_metric) (&syn, metadata_area);
+  area = (*_syn_get_metric) (&__syn, metadata_area);
 
   if (area == 0.0) {
     delay.set_metrics (0, 0, 0);
@@ -482,43 +458,94 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   }
   else {
     delay.
-      set_metrics ((*_syn_get_metric) (&syn, metadata_delay_min),
-		   (*_syn_get_metric) (&syn, metadata_delay_typ),
-		   (*_syn_get_metric) (&syn, metadata_delay_max)
+      set_metrics ((*_syn_get_metric) (&__syn, metadata_delay_min),
+		   (*_syn_get_metric) (&__syn, metadata_delay_typ),
+		   (*_syn_get_metric) (&__syn, metadata_delay_max)
 		   );
 
     static_power.
-      set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ_static),
-		   (*_syn_get_metric) (&syn, metadata_power_typ_static),
-		   (*_syn_get_metric) (&syn, metadata_power_max_static)
+      set_metrics ((*_syn_get_metric) (&__syn, metadata_power_typ_static),
+		   (*_syn_get_metric) (&__syn, metadata_power_typ_static),
+		   (*_syn_get_metric) (&__syn, metadata_power_max_static)
 		   );
 
     dynamic_power.
-      set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ_dynamic),
-		   (*_syn_get_metric) (&syn, metadata_power_typ_dynamic),
-		   (*_syn_get_metric) (&syn, metadata_power_max_dynamic)
+      set_metrics ((*_syn_get_metric) (&__syn, metadata_power_typ_dynamic),
+		   (*_syn_get_metric) (&__syn, metadata_power_typ_dynamic),
+		   (*_syn_get_metric) (&__syn, metadata_power_max_dynamic)
 		   );
     
     total_power.
-      set_metrics ((*_syn_get_metric) (&syn, metadata_power_typ),
-		   (*_syn_get_metric) (&syn, metadata_power_typ),
-		   (*_syn_get_metric) (&syn, metadata_power_max)
+      set_metrics ((*_syn_get_metric) (&__syn, metadata_power_typ),
+		   (*_syn_get_metric) (&__syn, metadata_power_typ),
+		   (*_syn_get_metric) (&__syn, metadata_power_max)
 		   );
   }
 
-  info =  new ExprBlockInfo(delay,
-			    total_power,
-			    static_power,
-			    dynamic_power,
-			    area,
-          duration.count(),
-          io_duration.count()
-          );
-
-  // clean up temporary files
-  if (_cleanup) {
-    (*_syn_cleanup) (&syn);
-  }
+  auto info =  new ExprBlockInfo(delay,
+              total_power,
+              static_power,
+              dynamic_power,
+              area,
+              duration.count(),
+              io_duration.count(),
+              _mapped_file
+              );
 
   return info;
+}
+
+void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
+{
+  char cmd[4096] = "";
+  // read the resulting netlist and map it back to act, if the
+  // wire_type is not bool use the async mode the specify a wire type
+  // as a channel.  skip if run was just for extraction of properties
+  // => output filename empty
+  if (wire_encoding == qdi) {
+    // QDI, so we don't add tie cells
+    snprintf(cmd, 4096, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
+        expr_channel_type.data(),
+        cell_act_file.data(),
+        cell_namespace.data(),
+        _mapped_file.data(),
+        expr_output_file.data());
+  }
+  else {
+    if (!(tie_cells)) {
+      snprintf(cmd, 4096, "v2act -t -l %s -n %s %s >> %s",
+        cell_act_file.data(),
+        cell_namespace.data(),
+        _mapped_file.data(),
+        expr_output_file.data());
+    }
+    else {
+      snprintf(cmd, 4096, "v2act -l %s -n %s %s >> %s",
+        cell_act_file.data(),
+        cell_namespace.data(),
+        _mapped_file.data(),
+        expr_output_file.data());
+    }
+  }
+  
+  if (config_get_int("synth.expropt.verbose") == 2) {
+    printf("running: %s \n",cmd);
+  }
+  else if (config_get_int("synth.expropt.verbose") == 1) {
+    printf(".");
+    fflush(stdout);
+  }
+
+  int exec_failure = system(cmd);
+  if (exec_failure != 0) {
+    fatal_error("external program call \"%s\" failed.", cmd);
+  }
+}
+
+void ExternalExprOpt::cleanup_tmp_files()
+{
+  // clean up temporary files
+  if (_cleanup) {
+    (*_syn_cleanup) (&__syn);
+  }
 }

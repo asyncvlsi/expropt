@@ -104,6 +104,7 @@ private:
     metric_triplet total_power;	//<  total power (W)
     long long mapper_runtime; //<  logic synthesis tool runtime (us)
     long long interface_runtime; //< interface tools (verilog_printing + v2act) runtime (us)
+    std::string mapped_file; //< mapped verilog file
 
     /*
     * the theoretical area of all gates combined, with 100% utiliasation.
@@ -120,6 +121,7 @@ public:
     double getArea() { return area; }
     long long getRuntime() { return mapper_runtime; }
     long long getIORuntime() { return interface_runtime; }
+    std::string getMappedFile() { return mapped_file; }
 
     /**
      * Construct a new Expr Block Info object, 
@@ -132,14 +134,16 @@ public:
             const metric_triplet e_dynamic_power,
             const double e_area,
         const long long e_runtime,
-        const long long e_io_runtime) :
+        const long long e_io_runtime,
+        std::string e_mapped_file) :
         delay{e_delay},
         total_power{e_power},
         static_power{e_static_power},
         dynamic_power{e_dynamic_power},
         area{e_area},
         mapper_runtime{e_runtime},
-        interface_runtime{e_io_runtime}
+        interface_runtime{e_io_runtime},
+        mapped_file{e_mapped_file}
     { }
                         
     /**

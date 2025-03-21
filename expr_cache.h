@@ -22,6 +22,7 @@
 #pragma once
 
 #include <act/expropt.h>
+// #include "expropt.h"
 
 /*
     Path of an expression file within the cache.
@@ -30,7 +31,6 @@
 typedef int expr_path;
 
 static const std::string _tmp_expr_file = "tmp_expr.act";
-static const std::string _cache_dummy_ns = "_cache_ns_";
 
 class ExprCache : public ExternalExprOpt {
 public:
@@ -59,12 +59,16 @@ private:
     void read_cache ();
     void read_cache_index_line (std::string);
     void write_cache_index_line (std::string);
-    void rename_and_pipe (std::ifstream &, std::ofstream &, const std::string, const std::string);
+    void rename_and_pipe (std::ifstream &, std::ofstream &, 
+                            const std::vector<std::string>, 
+                            const std::vector<std::string>);
+
+    void v2act_and_pipe (std::ifstream &src, std::ofstream &dst);
 
     int lock_file (std::string);
     void unlock_file (int);
 
-    std::string _gen_unique_id (Expr *, list_t *, iHashtable *);
+    std::string _gen_unique_id (Expr *, list_t *, iHashtable *, int);
 
     /*
         define a next() function for the
@@ -73,6 +77,9 @@ private:
     expr_path gen_expr_path () {
         return cache_counter++;
     }
+
+    std::vector<std::string> s_orig;
+    std::vector<std::string> s_cache;
 
     std::string path;
     std::string index_file;
