@@ -179,7 +179,18 @@ public:
 				   list_t *in_expr_list,
 				   iHashtable *in_expr_map,
 				   iHashtable *in_width_map,
-           bool run_backend = true);
+           bool __cleanup = true);
+
+  /* 
+   * Same as above but with string name
+   */
+  ExprBlockInfo* run_external_opt (std::string expr_name,
+				   int targetwidth,
+				   Expr *e,
+				   list_t *in_expr_list,
+				   iHashtable *in_expr_map,
+				   iHashtable *in_width_map,
+           bool __cleanup = true);
 
   /**
    * Simple C-STRING MODE - set of expr - recomended mode - outputs are
@@ -228,7 +239,7 @@ public:
 				   iHashtable *out_expr_map,
 				   iHashtable *out_width_map,
 				   list_t *hidden_expr_list = NULL,
-           bool run_backend = true);
+           bool __cleanup = true);
 
   
   /**
@@ -281,7 +292,7 @@ public:
 				   iHashtable *out_width_map,
 				   list_t *hidden_expr_list = NULL,
 				   list_t *hidden_expr_name_list = NULL,
-           bool run_backend = true);
+           bool __cleanup = true);
 
 
 protected:
@@ -343,7 +354,7 @@ protected:
     /**
      * the output file name where all act results are appended too.
      */
-    const std::string expr_output_file;
+    std::string expr_output_file;
 
     /**
      * the act cell lib read from the config file
