@@ -138,6 +138,96 @@ void ExternalExprOpt::_init_defaults ()
 
 
 /*------------------------------------------------------------------------
+ * Simplest expression optimization run - with string name
+ *------------------------------------------------------------------------
+ */
+ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_name,
+						  int targetwidth,
+						  Expr *expr,
+						  list_t *in_expr_list,
+						  iHashtable *in_expr_map,
+						  iHashtable *in_width_map,
+              bool __cleanup)
+{
+  // build the data structures needed
+
+  ExprBlockInfo* info;
+  iHashtable *outexprmap = ihash_new(0);
+  iHashtable *inexprmap = ihash_new(0);
+  iHashtable *outwidthmap = ihash_new(0);
+  list_t *outlist = list_new();
+
+  // convert input list, reverse searching nessesary, should always
+  // use last on multimatching
+  listitem_t *li;
+  Expr* e = NULL;
+  for (li = list_first (in_expr_list); li; li = list_next (li)) { 
+    e = (Expr *) list_value(li);
+    // change from int to C string
+    ihash_bucket_t *b_map,*b_new;
+    b_map = ihash_lookup(in_expr_map, (long) e);
+    char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
+    snprintf(charbuf, 1024, "%s%u",expr_prefix.data(),b_map->i);
+    b_new = ihash_add(inexprmap, (long) e);
+    b_new->v = charbuf;
+  }
+
+  ihash_bucket_t *b_map;
+  char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
+
+  // the output should be called "out"
+  snprintf(charbuf,1024, "out");
+  b_map = ihash_add(outexprmap,(long) expr);
+  b_map->v = charbuf;
+
+  // add the Expr * to the output list
+  list_append(outlist, expr);
+
+  // add the bitwidth to the bitwidth hash table
+  ihash_bucket_t *b_width;
+  b_width = ihash_add(outwidthmap,(long) expr);
+  b_width->i = targetwidth;
+
+  // generate module name 
+  char expr_set_name[1024];
+  snprintf(expr_set_name, 1024, "%s%s",module_prefix.data(), expr_name.c_str());
+  
+  // and send off
+  info = run_external_opt(expr_set_name,
+			  in_expr_list,
+			  inexprmap,
+			  in_width_map,
+			  outlist,
+			  outexprmap,
+			  outwidthmap,
+        NULL,
+        __cleanup);
+
+  // after completerion clean up memory, the generated char names will
+  // leak they are not cleaned up atm.
+  list_free(outlist);
+  ihash_free(outwidthmap);
+
+  // delete the strings in outexprmap and inexprmap
+  ihash_iter_t it;
+  ihash_iter_init (outexprmap, &it); // ok this can be done in a much
+				     // simpler manner...
+  while ((b_map = ihash_iter_next (outexprmap, &it))) {
+    FREE (b_map->v);
+  }
+  ihash_free(outexprmap);
+
+  ihash_iter_init (inexprmap, &it);
+  while ((b_map = ihash_iter_next (inexprmap, &it))) {
+    FREE (b_map->v);
+  }
+  ihash_free(inexprmap);
+
+  return info;
+}
+
+
+/*------------------------------------------------------------------------
  * Simplest expression optimization run
  *------------------------------------------------------------------------
  */
@@ -489,7 +579,8 @@ ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
               area,
               duration.count(),
               io_duration.count(),
-              _mapped_file
+              _mapped_file,
+              ""
               );
 
   return info;

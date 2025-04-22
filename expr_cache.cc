@@ -89,7 +89,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
  :  ExternalExprOpt ( datapath_synthesis_tool,
                       mapping_target,
                       tie_cells,
-                      _tmp_expr_file,
+                      "",
                       "in_",
                       "blk_") 
 {
@@ -145,6 +145,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
     index_file = index_filename;
     idx_file_delimiter = ' ';
     path_map.clear();
+    runtime_accessed_set.clear();
 
     // the number of metrics to store
     n_metrics = 4;
@@ -180,8 +181,7 @@ std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list,
     return uniq_id;
 }
 
-ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
-                                      int targetwidth,
+ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
                                       Expr *expr,
                                       list_t *in_expr_list,
                                       iHashtable *in_expr_map,
@@ -196,8 +196,9 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
     }
     // gotta synth and add to cache
     else {
-        ExprBlockInfo *ebi = run_external_opt(expr_set_number, targetwidth, expr, 
+        ExprBlockInfo *ebi = run_external_opt(uniq_id, targetwidth, expr, 
                                 in_expr_list, in_expr_map, in_width_map, false);
+        ebi->setID(uniq_id);
         auto verilogfile = ebi->getMappedFile();
 
         auto idx = gen_expr_path();
@@ -228,39 +229,49 @@ ExprBlockInfo *ExprCache::synth_expr (int expr_set_number,
 
         rename_and_pipe(sourceFile, destFile, {}, {});
 
-        if (!fs::remove(verilogfile)) {
-            std::cerr << verilogfile << " could not be deleted\n";
-            exit(1);
-        }
+        // if (!fs::remove(verilogfile)) {
+        //     std::cerr << verilogfile << " could not be deleted\n";
+        //     exit(1);
+        // }
         unlock_file(fd);
 
         cleanup_tmp_files();
         write_cache_index_line (uniq_id);
     }
 
-    // read the cached defproc
-    Assert (fs::exists(path), "what");
-    std::string fn = path;
-    fn.append("/");
-    fn.append(std::to_string(path_map.at(uniq_id)));
-    fn.append(".v");
+    if (!(runtime_accessed_set.contains(uniq_id)))
+    {
+        // for ( auto x : runtime_accessed_set ) {
+        // fprintf (stdout, "\nMember: %s\n", x.c_str());
+        // }
+        // fprintf (stdout, "\nID: %s\n", uniq_id.c_str());
+        // read the cached defproc
+        Assert (fs::exists(path), "what");
+        std::string fn = path;
+        fn.append("/");
+        fn.append(std::to_string(path_map.at(uniq_id)));
+        fn.append(".v");
 
-    // append all contents of reqd. cache file to output expr file
-    int fd = lock_file(fn);
-    std::ifstream sourceFile(fn);
-    if (!sourceFile.is_open()) {
-        std::cerr << "Error opening source file: " << fn << "\n";
-        exit(1);
-    }
-    std::ofstream destFile(_expr_file_path, std::ios::app);
-    if (!destFile.is_open()) {
-        std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
-        exit(1);
-    }
+        // append all contents of reqd. cache file to output expr file
+        int fd = lock_file(fn);
+        std::ifstream sourceFile(fn);
+        if (!sourceFile.is_open()) {
+            std::cerr << "Error opening source file: " << fn << "\n";
+            exit(1);
+        }
+        std::ofstream destFile(_expr_file_path, std::ios::app);
+        if (!destFile.is_open()) {
+            std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
+            exit(1);
+        }
 
-    std::chrono::microseconds dummy;
-    backend(fn, dummy, dummy);
-    unlock_file(fd);
+        std::chrono::microseconds dummy;
+        expr_output_file = _expr_file_path;
+        backend(fn, dummy, dummy);
+        expr_output_file = "";
+        unlock_file(fd);
+        runtime_accessed_set.insert(uniq_id);
+    }
 
     ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
     ExprBlockInfo *ebi = new ExprBlockInfo(eb);
@@ -349,7 +360,7 @@ void ExprCache::read_cache_index_line (std::string line) {
     double mapper_runtime = std::stod(tokens[mapper_runtime_id]);
     double io_runtime = std::stod(tokens[io_runtime_id]);
 
-    ExprBlockInfo eb (del, pow, st_pow, dyn_pow, area, mapper_runtime, io_runtime, std::to_string(loc)+".v");
+    ExprBlockInfo eb (del, pow, st_pow, dyn_pow, area, mapper_runtime, io_runtime, std::to_string(loc)+".v", tokens[0]);
     Assert (!info_map.contains(loc), "duplicate data in cache index file");
     info_map.insert({loc, eb});
 }

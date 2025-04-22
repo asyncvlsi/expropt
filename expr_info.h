@@ -105,6 +105,7 @@ private:
     long long mapper_runtime; //<  logic synthesis tool runtime (us)
     long long interface_runtime; //< interface tools (verilog_printing + v2act) runtime (us)
     std::string mapped_file; //< mapped verilog file
+    std::string unique_id; //< unique id for the generated expression (cache only)
 
     /*
     * the theoretical area of all gates combined, with 100% utiliasation.
@@ -122,6 +123,8 @@ public:
     long long getRuntime() { return mapper_runtime; }
     long long getIORuntime() { return interface_runtime; }
     std::string getMappedFile() { return mapped_file; }
+    std::string getID() { return unique_id; }
+    void setID(std::string s) { unique_id = s; }
 
     /**
      * Construct a new Expr Block Info object, 
@@ -135,7 +138,8 @@ public:
             const double e_area,
         const long long e_runtime,
         const long long e_io_runtime,
-        std::string e_mapped_file) :
+        std::string e_mapped_file,
+        std::string e_unique_id) :
         delay{e_delay},
         total_power{e_power},
         static_power{e_static_power},
@@ -143,7 +147,8 @@ public:
         area{e_area},
         mapper_runtime{e_runtime},
         interface_runtime{e_io_runtime},
-        mapped_file{e_mapped_file}
+        mapped_file{e_mapped_file},
+        unique_id{e_unique_id}
     { }
                         
     /**

@@ -47,7 +47,7 @@ public:
         run_external_opt for the expropt object. 
         Arguments are exactly the same.
     */
-    ExprBlockInfo *synth_expr (int, int, Expr *, list_t *, iHashtable *, iHashtable *);
+    ExprBlockInfo *synth_expr (int, Expr *, list_t *, iHashtable *, iHashtable *);
 
     /*
         Get path to cache that is being used.
@@ -78,9 +78,6 @@ private:
         return cache_counter++;
     }
 
-    std::vector<std::string> s_orig;
-    std::vector<std::string> s_cache;
-
     std::string path;
     std::string index_file;
 
@@ -99,5 +96,9 @@ private:
     std::unordered_map<std::string, expr_path> path_map;
     // Path-to-info
     std::unordered_map<expr_path, ExprBlockInfo> info_map;
+
+    // Keep track of which exprs have already been copied over
+    // To avoid double-defining the same expr blk
+    std::unordered_set<std::string> runtime_accessed_set;
 
 };
