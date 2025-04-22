@@ -9,4 +9,4 @@ echo "Building abc: dynamic library..."
 (cd abc2; make -j 4 ABC_USE_NO_READLINE=1 ABC_USE_PIC=1 libabc.so; cp libabc.so $ACT_HOME/lib)
 
 echo "Building expropt..."
-make "$@" depend && make "$@" && make install
+make install_inc && make "$@" depend && make "$@" && make install
