@@ -45,11 +45,11 @@ ExternalExprOpt::~ExternalExprOpt()
 bool ExternalExprOpt::engineExists (const char *s)
 {
   // if a mapper string has been specified, find the library!
-  char buf[10240];
+  char buf[char_buf_sz];
   
   if (!getenv ("ACT_HOME")) return false;
   
-  snprintf (buf, 10240, "%s/lib/act_extsyn_%s.so", getenv ("ACT_HOME"), s);
+  snprintf (buf, char_buf_sz, "%s/lib/act_extsyn_%s.so", getenv ("ACT_HOME"), s);
 
   FILE *fp = fopen (buf, "r");
   if (!fp) {
@@ -108,8 +108,8 @@ void ExternalExprOpt::_init_defaults ()
   }
 
   // if a mapper string has been specified, find the library!
-  char buf[10240];
-  snprintf (buf, 10240, "%s/lib/act_extsyn_%s.so",
+  char buf[char_buf_sz];
+  snprintf (buf, char_buf_sz, "%s/lib/act_extsyn_%s.so",
 	    getenv ("ACT_HOME"),
 	    mapper);
   _syn_dlib = dlopen (buf, RTLD_LAZY);
@@ -117,17 +117,17 @@ void ExternalExprOpt::_init_defaults ()
     fatal_error ("could not open `%s' external logic synthesis library!", buf);
   }
 
-  snprintf (buf, 10240, "%s_run", mapper);
+  snprintf (buf, char_buf_sz, "%s_run", mapper);
   *((void **)&_syn_run)= dlsym (_syn_dlib, buf);
   if (!_syn_run) {
     fatal_error ("Expression synthesis library `%s': missing %s!", mapper, buf);
   }
-  snprintf (buf, 10240, "%s_get_metric", mapper);
+  snprintf (buf, char_buf_sz, "%s_get_metric", mapper);
   *((void **)&_syn_get_metric) = dlsym (_syn_dlib, buf);
   if (!_syn_get_metric) {
     fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
   }
-  snprintf (buf, 10240, "%s_cleanup", mapper);
+  snprintf (buf, char_buf_sz, "%s_cleanup", mapper);
   *((void **)&_syn_cleanup) = dlsym (_syn_dlib, buf);
   if (!_syn_cleanup) {
     fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
@@ -166,17 +166,17 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_name,
     // change from int to C string
     ihash_bucket_t *b_map,*b_new;
     b_map = ihash_lookup(in_expr_map, (long) e);
-    char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
-    snprintf(charbuf, 1024, "%s%u",expr_prefix.data(),b_map->i);
+    char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
+    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.data(),b_map->i);
     b_new = ihash_add(inexprmap, (long) e);
     b_new->v = charbuf;
   }
 
   ihash_bucket_t *b_map;
-  char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
+  char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
 
   // the output should be called "out"
-  snprintf(charbuf,1024, "out");
+  snprintf(charbuf,char_buf_sz, "out");
   b_map = ihash_add(outexprmap,(long) expr);
   b_map->v = charbuf;
 
@@ -189,8 +189,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_name,
   b_width->i = targetwidth;
 
   // generate module name 
-  char expr_set_name[1024];
-  snprintf(expr_set_name, 1024, "%s%s",module_prefix.data(), expr_name.c_str());
+  char expr_set_name[char_buf_sz];
+  snprintf(expr_set_name, char_buf_sz, "%s%s",module_prefix.data(), expr_name.c_str());
   
   // and send off
   info = run_external_opt(expr_set_name,
@@ -256,17 +256,17 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
     // change from int to C string
     ihash_bucket_t *b_map,*b_new;
     b_map = ihash_lookup(in_expr_map, (long) e);
-    char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
-    snprintf(charbuf, 1024, "%s%u",expr_prefix.data(),b_map->i);
+    char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
+    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.data(),b_map->i);
     b_new = ihash_add(inexprmap, (long) e);
     b_new->v = charbuf;
   }
 
   ihash_bucket_t *b_map;
-  char *charbuf = (char *) malloc( sizeof(char) * ( 1024 + 1 ) );
+  char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
 
   // the output should be called "out"
-  snprintf(charbuf,1024, "out");
+  snprintf(charbuf,char_buf_sz, "out");
   b_map = ihash_add(outexprmap,(long) expr);
   b_map->v = charbuf;
 
@@ -279,8 +279,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
   b_width->i = targetwidth;
 
   // generate module name 
-  char expr_set_name[1024];
-  snprintf(expr_set_name, 1024, "%s%u",module_prefix.data(), expr_set_number);
+  char expr_set_name[char_buf_sz];
+  snprintf(expr_set_name, char_buf_sz, "%s%u",module_prefix.data(), expr_set_number);
   
   // and send off
   info = run_external_opt(expr_set_name,
@@ -445,14 +445,14 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
 
   // generate verilog module
   {
-    char buf[1024];
+    char buf[char_buf_sz];
     const char *module_name = expr_set_name;
     
     if (strcmp (mapper, "abc") == 0) {
       /* abc is going to mess up the port names, so we need to fix
 	 that; we do this by changing the Verilog module name, and then
 	 creating a dummy passthru instance in the abc API (abc_api.cc) */
-      snprintf (buf, 1024, "%stmp", expr_set_name);
+      snprintf (buf, char_buf_sz, "%stmp", expr_set_name);
       module_name = buf;
     }
     auto start_print_verilog = high_resolution_clock::now();
@@ -588,14 +588,14 @@ ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
 
 void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
 {
-  char cmd[4096] = "";
+  char cmd[char_buf_sz] = "";
   // read the resulting netlist and map it back to act, if the
   // wire_type is not bool use the async mode the specify a wire type
   // as a channel.  skip if run was just for extraction of properties
   // => output filename empty
   if (wire_encoding == qdi) {
     // QDI, so we don't add tie cells
-    snprintf(cmd, 4096, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
+    snprintf(cmd, char_buf_sz, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
         expr_channel_type.data(),
         cell_act_file.data(),
         cell_namespace.data(),
@@ -604,14 +604,14 @@ void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
   }
   else {
     if (!(tie_cells)) {
-      snprintf(cmd, 4096, "v2act -t -l %s -n %s %s >> %s",
+      snprintf(cmd, char_buf_sz, "v2act -t -l %s -n %s %s >> %s",
         cell_act_file.data(),
         cell_namespace.data(),
         _mapped_file.data(),
         expr_output_file.data());
     }
     else {
-      snprintf(cmd, 4096, "v2act -l %s -n %s %s >> %s",
+      snprintf(cmd, char_buf_sz, "v2act -l %s -n %s %s >> %s",
         cell_act_file.data(),
         cell_namespace.data(),
         _mapped_file.data(),

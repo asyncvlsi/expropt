@@ -98,7 +98,7 @@ void AbcApi::_mainloop()
   int sz, pos;
   int cmd_end;
 
-  buf_max = 1024;
+  buf_max = char_buf_sz_abc;
   MALLOC (buf, char, buf_max);
 
 #define GET_MORE					\
@@ -118,7 +118,7 @@ void AbcApi::_mainloop()
       GET_MORE;
     }
 
-    if (sz < 1024) {
+    if (sz < char_buf_sz_abc) {
       buf[sz] = '\0';
     }
     
@@ -249,7 +249,7 @@ bool AbcApi::_run_abc (char *cmd)
 
 bool AbcApi::_startsession(char *args)
 {
-  char buf[1024];
+  char buf[char_buf_sz_abc];
   Assert (_parent == false, "What?");
 
 
@@ -282,7 +282,7 @@ bool AbcApi::_startsession(char *args)
 
   _vout = Strdup (name);
       
-  snprintf (buf, 1024, "%s.log", _vout);
+  snprintf (buf, char_buf_sz_abc, "%s.log", _vout);
   _logfd = open (buf, O_CREAT|O_TRUNC|O_RDWR, S_IRUSR|S_IWUSR);
 
   if (_logfd < 0) {
@@ -298,11 +298,11 @@ bool AbcApi::_startsession(char *args)
   _pAbc = Abc_FrameGetGlobalFrame ();
   
   // read Verilog, blast it, and read in the liberty file
-  snprintf (buf, 1024, "%%read %s; %%blast; &put", _vin);
+  snprintf (buf, char_buf_sz_abc, "%%read %s; %%blast; &put", _vin);
   if (!_run_abc (buf)) return false;
 
   char *lib = config_get_string("synth.liberty.typical");
-  snprintf (buf, 1024, "read_lib -v %s", lib);
+  snprintf (buf, char_buf_sz_abc, "read_lib -v %s", lib);
   if (!_run_abc (buf)) return false;
 
   int constr = 0;
@@ -320,7 +320,7 @@ bool AbcApi::_startsession(char *args)
       name[len-1] = '\0';
       name[len-2] = '\0';
     }
-    snprintf (buf, 1024, "read_constr %s.sdc", name);
+    snprintf (buf, char_buf_sz_abc, "read_constr %s.sdc", name);
     FREE (name);
     if (!_run_abc (buf)) return false;
   }
@@ -576,7 +576,7 @@ static bool my_fgets (char **buf, int *buf_max, FILE *fp)
 
 bool AbcApi::_endsession()
 {
-  int buf_max = 10240;
+  int buf_max = char_buf_sz_abc;
   char *buf;
 
   if (!_pAbc) {
@@ -585,20 +585,20 @@ bool AbcApi::_endsession()
 
   MALLOC (buf, char, buf_max);
 
-  snprintf (buf, 1024, "write_verilog %s", _vout);
+  snprintf (buf, char_buf_sz_abc, "write_verilog %s", _vout);
   _run_abc (buf);
   fflush (stdout);
   fflush (stderr);
   write (_logfd, "\n", 1);
   
-  snprintf (buf, 1024, "print_io; print_gates");
+  snprintf (buf, char_buf_sz_abc, "print_io; print_gates");
   _run_abc (buf);
   fflush (stdout);
   fflush (stderr);
 
   FILE *fp;
   FILE *vfp;
-  snprintf (buf, 1024, "%s.log", _vout);
+  snprintf (buf, char_buf_sz_abc, "%s.log", _vout);
   if (!(fp = fopen (buf, "r"))) {
     FREE (buf);
     return false;
@@ -639,7 +639,7 @@ bool AbcApi::_endsession()
   }
   fclose (fp);
 
-  snprintf (buf, 1024, "%s", _vout);
+  snprintf (buf, char_buf_sz_abc, "%s", _vout);
   vfp = fopen (buf, "a");
   fprintf (vfp, "module %s (", _name);
 
