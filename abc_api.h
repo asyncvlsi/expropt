@@ -22,6 +22,8 @@
 #ifndef __EXPROPT_ABC_API_H__
 #define __EXPROPT_ABC_API_H__
 
+static const int char_buf_sz_abc = 1024*32;
+
 /*
  * Minimal API to abc
  */

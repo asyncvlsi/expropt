@@ -248,8 +248,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       if (skip) continue;
      // also print the hidden assigns
       int idx = print_expression(output_stream, e, inexprmap);
-      char buf[100];
-      _gen_dummy_id (buf, 100, idx);
+      char buf[char_buf_sz];
+      _gen_dummy_id (buf, char_buf_sz, idx);
       fprintf(output_stream,"\tassign %s = %s;\n", current.data(), buf);
     }
   }
@@ -260,10 +260,10 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   for (li = list_first (out_list); li; li = list_next (li))
   {
     Expr *e = (Expr*) list_value (li);
-    char buf[100];
+    char buf[char_buf_sz];
     std::string current = (char *) list_value (li_name);
     int idx = print_expression(output_stream, e, inexprmap);
-    _gen_dummy_id (buf, 100, idx);
+    _gen_dummy_id (buf, char_buf_sz, idx);
     fprintf(output_stream,"\tassign %s = %s;\n", current.data(), buf);
     li_name = list_next(li_name);
   }
@@ -295,7 +295,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   int lw, rw;
   int lidx, ridx;
   int res, resw;
-  char buf[100];
+  char buf[char_buf_sz];
   Expr *orig_e = e;
 
   phash_bucket_t *b;
@@ -314,7 +314,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 #define DUMP_DECL_ASSIGN						\
   do {									\
     res = _gen_fresh_idx ();						\
-    _gen_dummy_id (buf, 100, res);					\
+    _gen_dummy_id (buf, char_buf_sz, res);					\
     if (resw == 1) {							\
       fprintf (output_stream, "\twire %s;\n", buf);			\
     }									\
@@ -341,7 +341,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     DUMP_DECL_ASSIGN;
 
     /* rhs */
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     fprintf (output_stream, "%s ? 1'b1 : 1'b0", buf);
     break;
 
@@ -356,7 +356,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     }
     DUMP_DECL_ASSIGN;
 
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     fprintf (output_stream, "%s", buf); 
     
     break;
@@ -368,11 +368,11 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     resw = act_expr_bitwidth (e->type, lw, rw);
 
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, 100, tmp);
+    _gen_dummy_id (buf, char_buf_sz, tmp);
     fprintf (output_stream, " %s ? ", buf);
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     fprintf (output_stream, " %s : ", buf);
-    _gen_dummy_id (buf, 100, ridx);
+    _gen_dummy_id (buf, char_buf_sz, ridx);
     fprintf (output_stream, " %s", buf);
     break;
     
@@ -396,7 +396,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     resw = act_expr_bitwidth (e->type, lw, rw);
     DUMP_DECL_ASSIGN;
 
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     fprintf(output_stream, "%s ", buf);
     if (e->type == E_AND) {
       fprintf (output_stream, "&");
@@ -440,7 +440,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     else if (e->type == E_NE) {
       fprintf (output_stream, "!=");
     }
-    _gen_dummy_id (buf, 100, ridx);
+    _gen_dummy_id (buf, char_buf_sz, ridx);
     fprintf(output_stream, " %s", buf);
     break;
 
@@ -458,7 +458,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     else if (e->type == E_UMINUS) {
       fprintf(output_stream, "-");
     }
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     fprintf (output_stream, "%s", buf);
     break;
 
@@ -473,7 +473,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
     /* pad left */
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     if (lw < resw) {
       fprintf (output_stream, "{%d'b", resw-lw);
       for (int i=0; i < resw-lw; i++) {
@@ -490,7 +490,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     lidx = res;
 
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, 100, ridx);
+    _gen_dummy_id (buf, char_buf_sz, ridx);
     if (rw < resw) {
       fprintf (output_stream, "{%d'b", resw-rw);
       for (int i=0; i < resw-rw; i++) {
@@ -507,7 +507,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     ridx = res;
     
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, 100, lidx);
+    _gen_dummy_id (buf, char_buf_sz, lidx);
     fprintf(output_stream, "%s ", buf);
     if (e->type == E_PLUS) {
       fprintf (output_stream, "+");
@@ -521,7 +521,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     else if (e->type == E_LSL) {
       fprintf (output_stream, "<<");
     }      
-    _gen_dummy_id (buf, 100, ridx);
+    _gen_dummy_id (buf, char_buf_sz, ridx);
     fprintf (output_stream, " %s", buf);
     break;
 
@@ -623,7 +623,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	DUMP_DECL_ASSIGN;
 	fprintf (output_stream, "{");
 	for (listitem_t *li = list_first (resl); li; li = list_next (li)) {
-	  _gen_dummy_id (buf, 100, list_ivalue (li));
+	  _gen_dummy_id (buf, char_buf_sz, list_ivalue (li));
 	  fprintf (output_stream, "%s", buf);
 	  if (list_next (li)) {
 	    fprintf (output_stream, ", ");

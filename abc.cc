@@ -80,7 +80,7 @@ bool abc_run (act_syn_info *s)
 
 static double parse_abc_info (const char *file, double *area)
 {
-  char buf[10240];
+  char buf[char_buf_sz];
   FILE *fp;
   double ret;
 
@@ -96,7 +96,7 @@ static double parse_abc_info (const char *file, double *area)
     *area = 0;
   }
 
-  while (fgets (buf, 10240, fp)) {
+  while (fgets (buf, char_buf_sz, fp)) {
     char *tmp = strstr (buf, "Delay =");
     if (tmp) {
       if (sscanf (tmp, "Delay = %lf ps", &ret) == 1) {
@@ -107,7 +107,7 @@ static double parse_abc_info (const char *file, double *area)
     else {
       tmp = strstr (buf, "Fanin =");
       if (tmp) {
-	char cellname[1000];
+	char cellname[char_buf_sz];
 	int inst;
 	double tot_area;
 	if (sscanf (buf, "%s Fanin = %*d Instance = %d Area = %lg",
@@ -153,14 +153,14 @@ void abc_cleanup (act_syn_info *s)
 {
   char *sdc_file;
   int len;
-  char cmd[4096];
+  char cmd[char_buf_sz];
 
   len = strlen (s->v_in);
   MALLOC (sdc_file, char, len+3);
   snprintf (sdc_file, len + 3, "%s", s->v_in);
   snprintf (sdc_file + len - 2, 5, ".sdc");
   
-  snprintf(cmd, 4096, "rm %s && rm %s && rm %s && rm %s.* ",
+  snprintf(cmd, char_buf_sz, "rm %s && rm %s && rm %s && rm %s.* ",
 	   s->v_out, s->v_in, sdc_file, s->v_out);
 
   if (config_get_int("synth.expropt.verbose") == 2) {

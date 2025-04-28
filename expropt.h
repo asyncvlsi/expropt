@@ -28,6 +28,8 @@
 // #include <act/expr_info.h>
 #include "expr_info.h"
 
+static const int char_buf_sz = 1024*32;
+
 /**
  * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
  * it will also give you metadata back if the software supports it. 

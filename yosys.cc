@@ -66,12 +66,12 @@ static struct cell_info {
 
 static double parse_yosys_info (const char *file, double *area)
 {
-  char buf[10240];
+  char buf[char_buf_sz];
   FILE *fp;
   double ret;
   int i;
 
-  snprintf (buf, 10240, "%s.log", file);
+  snprintf (buf, char_buf_sz, "%s.log", file);
   fp = fopen (buf, "r");
   if (!fp) {
     return -1;
@@ -86,7 +86,7 @@ static double parse_yosys_info (const char *file, double *area)
     *area = 0;
   }
 
-  while (fgets (buf, 10240, fp)) {
+  while (fgets (buf, char_buf_sz, fp)) {
     if (strncmp (buf, "ABC:", 4) == 0) {
       char *tmp = strstr (buf, "Delay =");
       if (tmp) {
@@ -185,7 +185,7 @@ bool yosys_run (act_syn_info *s)
   // yosys gets its script passed via stdin (very short)
   char *libfile = config_get_string("synth.liberty.typical");
 
-  char cmd[10240];
+  char cmd[char_buf_sz];
   
   if (strcmp(libfile,"none") != 0) {
     int constr = 0;
@@ -198,7 +198,7 @@ bool yosys_run (act_syn_info *s)
 
     // start of the script
     pos = 0;
-    snprintf (cmd + pos, 10240 - pos, 
+    snprintf (cmd + pos, char_buf_sz - pos, 
 	      "echo \"read_verilog %s; "
 	      "synth -noabc -top %s; ",
 	      s->v_in, s->toplevel);
@@ -206,23 +206,23 @@ bool yosys_run (act_syn_info *s)
 
     // tech map
     if (constr) {
-      snprintf (cmd + pos, 10240 - pos, "abc -constr %s -liberty %s; ",
+      snprintf (cmd + pos, char_buf_sz - pos, "abc -constr %s -liberty %s; ",
 		sdc_file, libfile);
     }
     else {
-      snprintf (cmd + pos, 10240 - pos, "abc -liberty %s; ", libfile);
+      snprintf (cmd + pos, char_buf_sz - pos, "abc -liberty %s; ", libfile);
     }
     pos += strlen (cmd + pos);
 
     // tie cells
     if (s->use_tie_cells) {
-      snprintf (cmd + pos, 10240 - pos, 
+      snprintf (cmd + pos, char_buf_sz - pos, 
 		"hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; ");
       pos += strlen (cmd + pos);
     }
 
     // write results
-    snprintf(cmd + pos, 10240 - pos,
+    snprintf(cmd + pos, char_buf_sz - pos,
 	     "write_verilog -nohex -nodec %s;\" | yosys > %s.log",
 	     s->v_out, s->v_out);
   }
@@ -276,14 +276,14 @@ void yosys_cleanup (act_syn_info *s)
 {
   char *sdc_file;
   int len;
-  char cmd[4096];
+  char cmd[char_buf_sz];
 
   len = strlen (s->v_in);
   MALLOC (sdc_file, char, len+3);
   snprintf (sdc_file, len + 3, "%s", s->v_in);
   snprintf (sdc_file + len - 2, 5, ".sdc");
   
-  snprintf(cmd, 4096, "rm %s && rm %s && rm %s && rm %s.* ",
+  snprintf(cmd, char_buf_sz, "rm %s && rm %s && rm %s && rm %s.* ",
 	   s->v_out, s->v_in, sdc_file, s->v_out);
 
   if (config_get_int("synth.expropt.verbose") == 2) {
