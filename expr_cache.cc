@@ -162,23 +162,31 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
 }
 
 std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, 
-                        iHashtable *width_map, int outwidth)
+                        iHashtable *width_map, int outwidth, bool hash)
 {
     list_t *vars = list_new();
     act_expr_collect_ids (vars, e);
     std::string uniq_id = act_expr_to_string(vars, e);
+    std::string io_signature = "";
     for (listitem_t *li = list_first(in_expr_list); li; li = li->next) {
         Expr *evar = (Expr *)(list_value(li));
         auto b = ihash_lookup(width_map, (long)evar);
         Assert (b, "var. width not found");
         int width = b->i;
         // gotta append bitwidth   
-        uniq_id.append("_");
-        uniq_id.append(std::to_string(width));
+        io_signature.append("_");
+        io_signature.append(std::to_string(width));
     }
-    uniq_id.append("_");
-    uniq_id.append(std::to_string(outwidth));
-    return uniq_id;
+    io_signature.append("_");
+    io_signature.append(std::to_string(outwidth));
+
+    uniq_id.append(io_signature);
+    if (!hash) return uniq_id;
+
+    auto hashval = std::hash<std::string>{}(uniq_id);
+    std::string hashed_id = std::to_string(hashval);
+    hashed_id.append(io_signature);
+    return hashed_id;
 }
 
 ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
@@ -187,7 +195,7 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
                                       iHashtable *in_expr_map,
                                       iHashtable *in_width_map)
 {
-    std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map, targetwidth);
+    std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map, targetwidth, true);
 
     // already have it
     if (path_map.contains(uniq_id)) {
