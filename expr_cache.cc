@@ -135,7 +135,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
         idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
         idx_file << "# Expression cache index and metrics file" << std::endl;
         idx_file << "# Metrics except area are in triplets (min,typ,max)" << std::endl;
-        idx_file << "# Format: <unique_id> <dir_name> <delay> <static power> <dynamic power> <total power> <area> <mapper_runtime> <io_runtime>" << std::endl;
+        idx_file << "# Format: <unique_id> <file_name> <delay> <static power> <dynamic power> <total power> <area> <mapper_runtime> <io_runtime>" << std::endl;
         idx_file << "# Type: <string> <int> <double (s)> <double (W)> <double (W)> <double (W)> <double (W)> <mapper_runtime (us)> <io_runtime (us)>" << std::endl;
         idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
         idx_file.close();
@@ -161,16 +161,28 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
     read_cache();
 }
 
-std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list, 
-                        iHashtable *width_map, int outwidth, bool hash)
+std::string ExprCache::_gen_unique_id (Expr *e, iHashtable *expr_map, 
+                        iHashtable *width_map, int outwidth)
 {
     list_t *vars = list_new();
     act_expr_collect_ids (vars, e);
     std::string uniq_id = act_expr_to_string(vars, e);
     std::string io_signature = "";
-    for (listitem_t *li = list_first(in_expr_list); li; li = li->next) {
-        Expr *evar = (Expr *)(list_value(li));
-        auto b = ihash_lookup(width_map, (long)evar);
+
+    std::unordered_map<ActId *, Expr *> id_to_expr = {};
+    ihash_iter_t iter;
+    ihash_bucket_t *ib;
+    ihash_iter_init (expr_map, &iter);
+    while ((ib = ihash_iter_next (expr_map, &iter))) 
+    {
+        Expr *e1 = (Expr *)ib->key;
+        id_to_expr.insert({(ActId *)(e1->u.e.l), e1});
+    }
+
+    for (listitem_t *li = list_first(vars); li; li = li->next) 
+    {
+        auto id = (ActId *)(list_value(li));
+        auto b = ihash_lookup(width_map, (long)(id_to_expr.at(id)));
         Assert (b, "var. width not found");
         int width = b->i;
         // gotta append bitwidth   
@@ -181,12 +193,7 @@ std::string ExprCache::_gen_unique_id (Expr *e, list_t *in_expr_list,
     io_signature.append(std::to_string(outwidth));
 
     uniq_id.append(io_signature);
-    if (!hash) return uniq_id;
-
-    auto hashval = std::hash<std::string>{}(uniq_id);
-    std::string hashed_id = std::to_string(hashval);
-    hashed_id.append(io_signature);
-    return hashed_id;
+    return uniq_id;
 }
 
 ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
@@ -195,7 +202,7 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
                                       iHashtable *in_expr_map,
                                       iHashtable *in_width_map)
 {
-    std::string uniq_id = _gen_unique_id(expr, in_expr_list, in_width_map, targetwidth, true);
+    std::string uniq_id = _gen_unique_id(expr, in_expr_map, in_width_map, targetwidth);
 
     // already have it
     if (path_map.contains(uniq_id)) {
