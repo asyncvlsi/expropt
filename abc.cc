@@ -28,7 +28,6 @@ extern "C"
 bool abc_run (act_syn_info *s)
 {
   AbcApi *api;
-  char *sdc_file;
   
   if (config_get_int("synth.expropt.verbose") == 2) {
     printf("running: built-in abc \n");
@@ -38,25 +37,25 @@ bool abc_run (act_syn_info *s)
     fflush(stdout);
   }
 
-  int len = strlen (s->v_in);
-  MALLOC (sdc_file, char, len+3);
-  snprintf (sdc_file, len + 3, "%s", s->v_in);
-  snprintf (sdc_file + len - 2, 5, ".sdc");
+  std::string sdc_file = s->v_in;
+  sdc_file.pop_back();
+  sdc_file.pop_back();
+  sdc_file.append(".sdc");
 
-  FILE *fp = fopen (sdc_file, "w");
+  FILE *fp = fopen (sdc_file.c_str(), "w");
   if (!fp) {
-    fatal_error ("Could not open `%s' file!", sdc_file);
+    fatal_error ("Could not open `%s' file!", sdc_file.c_str());
   }
   fprintf (fp, "set_load %g\n", config_get_real ("synth.expropt.default_load"));
   if (config_exists("synth.expropt.driving_cell")) {
     fprintf (fp, "set_driving_cell %s\n", config_get_string ("synth.expropt.driving_cell"));
   }
   fclose (fp);
-  FREE (sdc_file);
+  // FREE (sdc_file);
 
   api = (AbcApi *) s->space;
   
-  if (!api->startSession (s->v_in, s->v_out, s->toplevel)) {
+  if (!api->startSession (s->v_in.c_str(), s->v_out.c_str(), s->toplevel.c_str())) {
     fatal_error ("Unable to start ABC session!");
   }
 
@@ -78,14 +77,13 @@ bool abc_run (act_syn_info *s)
 }
 
 
-static double parse_abc_info (const char *file, double *area)
+static double parse_abc_info (std::string file, double *area)
 {
-  char buf[char_buf_sz];
   FILE *fp;
   double ret;
 
-  snprintf (buf, 10240, "%s.log", file);
-  fp = fopen (buf, "r");
+  std::string logfile = file + ".log";
+  fp = fopen (logfile.c_str(), "r");
   if (!fp) {
     return -1;
   }
@@ -96,6 +94,7 @@ static double parse_abc_info (const char *file, double *area)
     *area = 0;
   }
 
+  char buf[char_buf_sz];
   while (fgets (buf, char_buf_sz, fp)) {
     char *tmp = strstr (buf, "Delay =");
     if (tmp) {
@@ -151,25 +150,19 @@ double abc_get_metric (act_syn_info *s, expropt_metadata type)
 extern "C"
 void abc_cleanup (act_syn_info *s)
 {
-  char *sdc_file;
-  int len;
-  char cmd[char_buf_sz];
-
-  len = strlen (s->v_in);
-  MALLOC (sdc_file, char, len+3);
-  snprintf (sdc_file, len + 3, "%s", s->v_in);
-  snprintf (sdc_file + len - 2, 5, ".sdc");
+  std::string sdc_file = s->v_in;
+  sdc_file.pop_back();
+  sdc_file.pop_back();
+  sdc_file.append(".sdc");
   
-  snprintf(cmd, char_buf_sz, "rm %s && rm %s && rm %s && rm %s.* ",
-	   s->v_out, s->v_in, sdc_file, s->v_out);
+  std::string cmd = "rm " + s->v_out + " && rm " + s->v_in + " && rm " + sdc_file + " && rm " + s->v_out +".* ";
 
   if (config_get_int("synth.expropt.verbose") == 2) {
-    printf("running: %s \n", cmd);
+    printf("running: %s \n", cmd.c_str());
   }
   else if (config_get_int("synth.expropt.verbose") == 1) {
     printf(".");
     fflush(stdout);
   }
-  system(cmd);
-  FREE (sdc_file);
+  system(cmd.c_str());
 }

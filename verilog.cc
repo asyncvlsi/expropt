@@ -30,7 +30,7 @@
  * expression print method for the assigns rhs.
  */
 void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
-					  const char* expr_set_name,
+					  std::string expr_set_name,
 					  list_t *in_list,
 					  iHashtable *inexprmap,
 					  iHashtable *inwidthmap,
@@ -54,10 +54,10 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
 		"verilog file is not writable");
   }
 
-  fprintf(output_stream,"// generated expression module for %s\n\n\n", expr_set_name);
+  fprintf(output_stream,"// generated expression module for %s\n\n\n", expr_set_name.c_str());
 
   // module header
-  fprintf(output_stream, "module %s (", expr_set_name);
+  fprintf(output_stream, "module %s (", expr_set_name.c_str());
 
   // now the ports for the header - first inputs
   bool first = true;
@@ -86,8 +86,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     }
     
     if (!skip) {
-      fprintf(output_stream, "%s", current.data());
-      list_append (all_names, current.data());
+      fprintf(output_stream, "%s", current.c_str());
+      list_append (all_names, current.c_str());
     }
   }
   hash_free (repeats);
@@ -112,8 +112,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       hash_add (repeats, current.c_str());
     }
     if (!skip) {
-      fprintf(output_stream, "%s", current.data());
-      list_append (all_names, current.data());
+      fprintf(output_stream, "%s", current.c_str());
+      list_append (all_names, current.c_str());
     }
     li_name = list_next(li_name);
   }
@@ -141,8 +141,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     // look up the bitwidth
     int width = ihash_lookup(inwidthmap, (long) list_value (li))->i;
     if ( width <=0 ) fatal_error("ExternalExprOpt::print_expr_verilog error: Expression operands have incompatible bit widths\n");
-    else if (width == 1 && vectorize==0) fprintf(output_stream, "\tinput %s ;\n", current.data());
-    else fprintf(output_stream, "\tinput [%i:0] %s ;\n", width-1, current.data());
+    else if (width == 1 && vectorize==0) fprintf(output_stream, "\tinput %s ;\n", current.c_str());
+    else fprintf(output_stream, "\tinput [%i:0] %s ;\n", width-1, current.c_str());
     _varwidths[current] = width;
   }
   hash_free (repeats);
@@ -169,8 +169,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     // look up the bitwidth
     int width = ihash_lookup(outwidthmap, (long) list_value (li))->i;
     if ( width <=0 ) fatal_error("chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
-    else if (width == 1 && vectorize==0) fprintf(output_stream, "\toutput %s ;\n", current.data());
-    else fprintf(output_stream, "\toutput [%i:0] %s ;\n", width-1, current.data());
+    else if (width == 1 && vectorize==0) fprintf(output_stream, "\toutput %s ;\n", current.c_str());
+    else fprintf(output_stream, "\toutput [%i:0] %s ;\n", width-1, current.c_str());
     _varwidths[current] = width;
   }
   hash_free (repeats);
@@ -199,9 +199,9 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       // the bitwidth
       int width = ihash_lookup(outwidthmap, (long) list_value (li))->i;
       if ( width <=0 ) fatal_error("chpexpr2verilog::print_expr_set error: Expression operands have incompatible bit widths\n");
-      else if (width == 1 && vectorize==0) fprintf(output_stream, "\twire %s ;\n", current.data());
-      else fprintf(output_stream, "\twire [%i:0] %s ;\n", width-1, current.data());
-      list_append (all_names, current.data());
+      else if (width == 1 && vectorize==0) fprintf(output_stream, "\twire %s ;\n", current.c_str());
+      else fprintf(output_stream, "\twire [%i:0] %s ;\n", width-1, current.c_str());
+      list_append (all_names, current.c_str());
       _varwidths[current] = width;
     }
   }
@@ -248,9 +248,8 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       if (skip) continue;
      // also print the hidden assigns
       int idx = print_expression(output_stream, e, inexprmap);
-      char buf[char_buf_sz];
-      _gen_dummy_id (buf, char_buf_sz, idx);
-      fprintf(output_stream,"\tassign %s = %s;\n", current.data(), buf);
+      auto buf = _gen_dummy_id(idx);
+      fprintf(output_stream,"\tassign %s = %s;\n", current.c_str(), buf.c_str());
     }
   }
 
@@ -260,11 +259,10 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   for (li = list_first (out_list); li; li = list_next (li))
   {
     Expr *e = (Expr*) list_value (li);
-    char buf[char_buf_sz];
     std::string current = (char *) list_value (li_name);
     int idx = print_expression(output_stream, e, inexprmap);
-    _gen_dummy_id (buf, char_buf_sz, idx);
-    fprintf(output_stream,"\tassign %s = %s;\n", current.data(), buf);
+    auto buf = _gen_dummy_id(idx);
+    fprintf(output_stream,"\tassign %s = %s;\n", current.c_str(), buf.c_str());
     li_name = list_next(li_name);
   }
   fprintf(output_stream, "\nendmodule\n");
@@ -295,7 +293,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   int lw, rw;
   int lidx, ridx;
   int res, resw;
-  char buf[char_buf_sz];
+  std::string buf;
   Expr *orig_e = e;
 
   phash_bucket_t *b;
@@ -314,14 +312,14 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 #define DUMP_DECL_ASSIGN						\
   do {									\
     res = _gen_fresh_idx ();						\
-    _gen_dummy_id (buf, char_buf_sz, res);					\
+    buf = _gen_dummy_id(res);					\
     if (resw == 1) {							\
-      fprintf (output_stream, "\twire %s;\n", buf);			\
+      fprintf (output_stream, "\twire %s;\n", buf.c_str());			\
     }									\
     else {								\
-      fprintf (output_stream, "\twire [%d:0] %s;\n", resw-1, buf);	\
+      fprintf (output_stream, "\twire [%d:0] %s;\n", resw-1, buf.c_str());	\
     }									\
-    fprintf (output_stream, "\tassign %s = ", buf);			\
+    fprintf (output_stream, "\tassign %s = ", buf.c_str());			\
     if (width) {							\
       *width = resw;							\
     }									\
@@ -341,8 +339,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     DUMP_DECL_ASSIGN;
 
     /* rhs */
-    _gen_dummy_id (buf, char_buf_sz, lidx);
-    fprintf (output_stream, "%s ? 1'b1 : 1'b0", buf);
+    buf = _gen_dummy_id(lidx);
+    fprintf (output_stream, "%s ? 1'b1 : 1'b0", buf.c_str());
     break;
 
   case E_BUILTIN_INT:
@@ -356,8 +354,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     }
     DUMP_DECL_ASSIGN;
 
-    _gen_dummy_id (buf, char_buf_sz, lidx);
-    fprintf (output_stream, "%s", buf); 
+    buf = _gen_dummy_id(lidx);
+    fprintf (output_stream, "%s", buf.c_str()); 
     
     break;
 
@@ -368,12 +366,12 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     resw = act_expr_bitwidth (e->type, lw, rw);
 
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, char_buf_sz, tmp);
-    fprintf (output_stream, " %s ? ", buf);
-    _gen_dummy_id (buf, char_buf_sz, lidx);
-    fprintf (output_stream, " %s : ", buf);
-    _gen_dummy_id (buf, char_buf_sz, ridx);
-    fprintf (output_stream, " %s", buf);
+    buf = _gen_dummy_id(tmp);
+    fprintf (output_stream, " %s ? ", buf.c_str());
+    buf = _gen_dummy_id(lidx);
+    fprintf (output_stream, " %s : ", buf.c_str());
+    buf = _gen_dummy_id(ridx);
+    fprintf (output_stream, " %s", buf.c_str());
     break;
     
     /* no padding needed, binary */
@@ -396,8 +394,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     resw = act_expr_bitwidth (e->type, lw, rw);
     DUMP_DECL_ASSIGN;
 
-    _gen_dummy_id (buf, char_buf_sz, lidx);
-    fprintf(output_stream, "%s ", buf);
+    buf = _gen_dummy_id(lidx);
+    fprintf(output_stream, "%s ", buf.c_str());
     if (e->type == E_AND) {
       fprintf (output_stream, "&");
     }
@@ -440,8 +438,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     else if (e->type == E_NE) {
       fprintf (output_stream, "!=");
     }
-    _gen_dummy_id (buf, char_buf_sz, ridx);
-    fprintf(output_stream, " %s", buf);
+    buf = _gen_dummy_id(ridx);
+    fprintf(output_stream, " %s", buf.c_str());
     break;
 
     /* unary */
@@ -458,8 +456,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     else if (e->type == E_UMINUS) {
       fprintf(output_stream, "-");
     }
-    _gen_dummy_id (buf, char_buf_sz, lidx);
-    fprintf (output_stream, "%s", buf);
+    buf = _gen_dummy_id(lidx);
+    fprintf (output_stream, "%s", buf.c_str());
     break;
 
     /* padding needed */
@@ -473,42 +471,42 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
     /* pad left */
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, char_buf_sz, lidx);
+    buf = _gen_dummy_id(lidx);
     if (lw < resw) {
       fprintf (output_stream, "{%d'b", resw-lw);
       for (int i=0; i < resw-lw; i++) {
 	fprintf (output_stream, "0");
       }
-      fprintf (output_stream, ",%s};\n", buf);
+      fprintf (output_stream, ",%s};\n", buf.c_str());
     }
     else if (lw > resw) {
-      fprintf (output_stream, "%s[%d:0]", buf, resw-1);
+      fprintf (output_stream, "%s[%d:0]", buf.c_str(), resw-1);
     }
     else {
-      fprintf (output_stream, "%s;\n", buf);
+      fprintf (output_stream, "%s;\n", buf.c_str());
     }
     lidx = res;
 
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, char_buf_sz, ridx);
+    buf = _gen_dummy_id(ridx);
     if (rw < resw) {
       fprintf (output_stream, "{%d'b", resw-rw);
       for (int i=0; i < resw-rw; i++) {
 	fprintf (output_stream, "0");
       }
-      fprintf (output_stream, ",%s};\n", buf);
+      fprintf (output_stream, ",%s};\n", buf.c_str());
     }
     else if (rw > resw) {
-      fprintf (output_stream, "%s[%d:0]", buf, resw-1);
+      fprintf (output_stream, "%s[%d:0]", buf.c_str(), resw-1);
     }
     else {
-      fprintf (output_stream, "%s;\n", buf);
+      fprintf (output_stream, "%s;\n", buf.c_str());
     }
     ridx = res;
     
     DUMP_DECL_ASSIGN;
-    _gen_dummy_id (buf, char_buf_sz, lidx);
-    fprintf(output_stream, "%s ", buf);
+    buf = _gen_dummy_id(lidx);
+    fprintf(output_stream, "%s ", buf.c_str());
     if (e->type == E_PLUS) {
       fprintf (output_stream, "+");
     }
@@ -521,8 +519,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     else if (e->type == E_LSL) {
       fprintf (output_stream, "<<");
     }      
-    _gen_dummy_id (buf, char_buf_sz, ridx);
-    fprintf (output_stream, " %s", buf);
+    buf = _gen_dummy_id(ridx);
+    fprintf (output_stream, " %s", buf.c_str());
     break;
 
     case (E_INT):
@@ -623,8 +621,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	DUMP_DECL_ASSIGN;
 	fprintf (output_stream, "{");
 	for (listitem_t *li = list_first (resl); li; li = list_next (li)) {
-	  _gen_dummy_id (buf, char_buf_sz, list_ivalue (li));
-	  fprintf (output_stream, "%s", buf);
+    buf = _gen_dummy_id(list_ivalue (li));
+	  fprintf (output_stream, "%s", buf.c_str());
 	  if (list_next (li)) {
 	    fprintf (output_stream, ", ");
 	  }

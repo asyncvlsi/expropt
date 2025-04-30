@@ -27,11 +27,15 @@
 #include <unordered_map>
 // #include <act/expr_info.h>
 #include "expr_info.h"
+#include <string.h>
+
+#include <filesystem>
+namespace fs = std::filesystem;
 
 static const int char_buf_sz = 1024*32;
 
 /**
- * ExternalExprOpt is an interface that wrapps the syntesis, optimisation and mapping to cells of a set of act expr.
+ * ExternalExprOpt is an interface that wrapps the synthesis, optimisation and mapping to cells of a set of act expr.
  * it will also give you metadata back if the software supports it. 
  * if you 
  */
@@ -59,7 +63,7 @@ public:
    * @param block_prefix the prefix for the expression block - if
    * integer id mode is used
    */
-  ExternalExprOpt( const char *datapath_syntesis_tool,
+  ExternalExprOpt( std::string datapath_synthesis_tool,
 		   const expr_mapping_target mapping_target,
 		   const bool tie_cells,
 		   const std::string expr_file_path = "",
@@ -69,7 +73,7 @@ public:
                         expr_output_file(expr_file_path),
 			expr_prefix(exprid_prefix),
 			module_prefix(block_prefix),
-			mapper(datapath_syntesis_tool),
+			mapper(datapath_synthesis_tool),
 			use_tie_cells(tie_cells),
                         wire_encoding(mapping_target)
   {
@@ -233,7 +237,7 @@ public:
    * are not used on the outputs, they can be used leafs for the
    * outputs again when using the same char* string name.
    */
-  ExprBlockInfo* run_external_opt (const char* expr_set_name,
+  ExprBlockInfo* run_external_opt (std::string expr_set_name,
 				   list_t *in_expr_list,
 				   iHashtable *in_expr_map,
 				   iHashtable *in_width_map,
@@ -285,7 +289,7 @@ public:
    * to hidden_expr_list) with the name (C string pointer) the result
    * of the expression is assinged to
    */
-  ExprBlockInfo* run_external_opt (const char* expr_set_name,
+  ExprBlockInfo* run_external_opt (std::string expr_set_name,
 				   list_t *in_expr_list,
 				   iHashtable *in_expr_map,
 				   iHashtable *in_width_map,
@@ -328,7 +332,7 @@ protected:
      * @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of the expression is assinged to.
      */
     void print_expr_verilog (FILE *output_stream,
-			     const char* expr_set_name,
+			     std::string expr_set_name,
 			     list_t *in_list,
 			     iHashtable *inexprmap,
 			     iHashtable *inwidthmap,
@@ -392,17 +396,17 @@ protected:
     const std::string module_prefix;
 
     /**
-     * the software to be used for syntesis and mapping.
+     * the software to be used for synthesis and mapping.
      */
-    const char *mapper;
+    std::string mapper;
 
     /**
-     * should tie cells be incerted by the syntesis software (true), or should v2act take cae of it (false)
+     * should tie cells be incerted by the synthesis software (true), or should v2act take cae of it (false)
      */
     const bool use_tie_cells;
 
     /**
-     * is it a bundeld data or dualrail pass?
+     * is it a bundled data or dualrail pass?
      */
     const expr_mapping_target wire_encoding;
 
@@ -411,8 +415,10 @@ protected:
      */
     char _dummy_prefix[10];
     int _dummy_idx;
-    void _gen_dummy_id (char *buf, int sz, int idx) {
-      snprintf (buf, sz, "%s%d", _dummy_prefix, idx);
+    std::string _gen_dummy_id (int idx) {
+      std::string ret = _dummy_prefix;
+      ret.append(std::to_string(idx));
+      return ret;
     }
     int _gen_fresh_idx () { return _dummy_idx++; }
 

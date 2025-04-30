@@ -89,9 +89,9 @@ enum expropt_metadata {
 };
 
 struct act_syn_info {
-  const char *v_in;
-  const char *v_out;
-  const char *toplevel;
+  std::string v_in;
+  std::string v_out;
+  std::string toplevel;
   bool use_tie_cells;
   void *space;			// use for whatever you want!
 };

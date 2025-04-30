@@ -45,13 +45,12 @@ ExternalExprOpt::~ExternalExprOpt()
 bool ExternalExprOpt::engineExists (const char *s)
 {
   // if a mapper string has been specified, find the library!
-  char buf[char_buf_sz];
   
   if (!getenv ("ACT_HOME")) return false;
   
-  snprintf (buf, char_buf_sz, "%s/lib/act_extsyn_%s.so", getenv ("ACT_HOME"), s);
+  std::string buf = std::string(getenv("ACT_HOME")) + "/lib/act_extsyn_" + std::string(s) + ".so";
 
-  FILE *fp = fopen (buf, "r");
+  FILE *fp = fopen (buf.c_str(), "r");
   if (!fp) {
     return false;
   }
@@ -103,7 +102,7 @@ void ExternalExprOpt::_init_defaults ()
   _syn_get_metric = NULL;
   _syn_cleanup = NULL;
 
-  if (!mapper) {
+  if (mapper.length()==0) {
     mapper = "abc";
   }
 
@@ -111,26 +110,26 @@ void ExternalExprOpt::_init_defaults ()
   char buf[char_buf_sz];
   snprintf (buf, char_buf_sz, "%s/lib/act_extsyn_%s.so",
 	    getenv ("ACT_HOME"),
-	    mapper);
+	    mapper.c_str());
   _syn_dlib = dlopen (buf, RTLD_LAZY);
   if (!_syn_dlib) {
     fatal_error ("could not open `%s' external logic synthesis library!", buf);
   }
 
-  snprintf (buf, char_buf_sz, "%s_run", mapper);
+  snprintf (buf, char_buf_sz, "%s_run", mapper.c_str());
   *((void **)&_syn_run)= dlsym (_syn_dlib, buf);
   if (!_syn_run) {
-    fatal_error ("Expression synthesis library `%s': missing %s!", mapper, buf);
+    fatal_error ("Expression synthesis library `%s': missing %s!", mapper.c_str(), buf);
   }
-  snprintf (buf, char_buf_sz, "%s_get_metric", mapper);
+  snprintf (buf, char_buf_sz, "%s_get_metric", mapper.c_str());
   *((void **)&_syn_get_metric) = dlsym (_syn_dlib, buf);
   if (!_syn_get_metric) {
-    fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
+    fatal_error ("Expression synthesis library `%s': missing %s", mapper.c_str(), buf);
   }
-  snprintf (buf, char_buf_sz, "%s_cleanup", mapper);
+  snprintf (buf, char_buf_sz, "%s_cleanup", mapper.c_str());
   *((void **)&_syn_cleanup) = dlsym (_syn_dlib, buf);
   if (!_syn_cleanup) {
-    fatal_error ("Expression synthesis library `%s': missing %s", mapper, buf);
+    fatal_error ("Expression synthesis library `%s': missing %s", mapper.c_str(), buf);
   }
 
   _filenum = 0;
@@ -167,7 +166,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_name,
     ihash_bucket_t *b_map,*b_new;
     b_map = ihash_lookup(in_expr_map, (long) e);
     char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
-    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.data(),b_map->i);
+    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.c_str(),b_map->i);
     b_new = ihash_add(inexprmap, (long) e);
     b_new->v = charbuf;
   }
@@ -189,8 +188,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_name,
   b_width->i = targetwidth;
 
   // generate module name 
-  char expr_set_name[char_buf_sz];
-  snprintf(expr_set_name, char_buf_sz, "%s%s",module_prefix.data(), expr_name.c_str());
+  std::string expr_set_name = module_prefix;
+  expr_set_name.append(expr_name);
   
   // and send off
   info = run_external_opt(expr_set_name,
@@ -257,7 +256,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
     ihash_bucket_t *b_map,*b_new;
     b_map = ihash_lookup(in_expr_map, (long) e);
     char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
-    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.data(),b_map->i);
+    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.c_str(),b_map->i);
     b_new = ihash_add(inexprmap, (long) e);
     b_new->v = charbuf;
   }
@@ -279,8 +278,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
   b_width->i = targetwidth;
 
   // generate module name 
-  char expr_set_name[char_buf_sz];
-  snprintf(expr_set_name, char_buf_sz, "%s%u",module_prefix.data(), expr_set_number);
+  std::string expr_set_name = module_prefix;
+  expr_set_name.append(std::to_string(expr_set_number));
   
   // and send off
   info = run_external_opt(expr_set_name,
@@ -324,7 +323,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
  * 
  * the printing of the verilog is seperate
  */
-ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
+ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
 						  list_t *in_expr_list,
 						  iHashtable *in_expr_map,
 						  iHashtable *in_width_map,
@@ -386,7 +385,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
  * 
  * the printing of the verilog is seperate
  */
-ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
+ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
 						  list_t *in_expr_list,
 						  iHashtable *in_expr_map,
 						  iHashtable *in_width_map,
@@ -420,7 +419,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   //verilog_file.append(expr_set_name);
   verilog_file.append (std::to_string (_filenum++));
   
-  std::string mapped_file = verilog_file.data();
+  std::string mapped_file = verilog_file;
   mapped_file.append(MAPPED_FILE_SUFFIX);
   
   mapped_file.append(".v");
@@ -435,25 +434,23 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   sdc_file.append(".sdc");
 
   // open temp verilog file to be syntesised
-  verilog_stream = fopen(verilog_file.data(), "w");
+  verilog_stream = fopen(verilog_file.c_str(), "w");
   if (!verilog_stream) {
     fatal_error("ExternalExprOpt::run_external_opt: "
-		"verilog file %s is not writable", verilog_file.data());
+		"verilog file %s is not writable", verilog_file.c_str());
   }
 
   std::chrono::microseconds io_duration(0);
 
   // generate verilog module
   {
-    char buf[char_buf_sz];
-    const char *module_name = expr_set_name;
+    std::string module_name = expr_set_name;
     
-    if (strcmp (mapper, "abc") == 0) {
+    if (mapper == "abc") {
       /* abc is going to mess up the port names, so we need to fix
 	 that; we do this by changing the Verilog module name, and then
 	 creating a dummy passthru instance in the abc API (abc_api.cc) */
-      snprintf (buf, char_buf_sz, "%stmp", expr_set_name);
-      module_name = buf;
+      module_name.append("tmp");
     }
     auto start_print_verilog = high_resolution_clock::now();
     print_expr_verilog(verilog_stream, module_name,
@@ -472,7 +469,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   // close Verilog file
   fclose(verilog_stream);
 
-  // generate the exec command for the sysntesis tool and run the syntesis
+  // generate the exec command for the sysntesis tool and run the synthesis
   int exec_failure = 1;
 
 
@@ -486,8 +483,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   */
 
   // parameters to be passed to the logic synthesis engine 
-  __syn.v_in = verilog_file.c_str();
-  __syn.v_out = mapped_file.c_str();
+  __syn.v_in = verilog_file;
+  __syn.v_out = mapped_file;
   __syn.toplevel = expr_set_name;
   __syn.use_tie_cells = use_tie_cells;
   __syn.space = NULL;
@@ -497,7 +494,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
     fatal_error("please define \"liberty.typical\" in synthesis configuration file 2");
   }
 
-  if (strcmp (mapper, "abc") == 0) {
+  if (mapper == "abc") {
     // Intrnal abc logic synthesis
     if (!_abc_api) {
       _abc_api = new AbcApi ();
@@ -507,7 +504,7 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (const char* expr_set_name,
   
   auto start_mapper = high_resolution_clock::now();
   if (!(*_syn_run) (&__syn)) {
-    fatal_error ("Synthesis %s failed.", mapper);
+    fatal_error ("Synthesis %s failed.", mapper.c_str());
   }
   auto stop_mapper = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop_mapper - start_mapper);
@@ -588,48 +585,38 @@ ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
 
 void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
 {
-  char cmd[char_buf_sz] = "";
+  std::string cmd = "";
   // read the resulting netlist and map it back to act, if the
   // wire_type is not bool use the async mode the specify a wire type
   // as a channel.  skip if run was just for extraction of properties
   // => output filename empty
   if (wire_encoding == qdi) {
     // QDI, so we don't add tie cells
-    snprintf(cmd, char_buf_sz, "v2act -a -C \"%s\" -l %s -n %s %s >> %s",
-        expr_channel_type.data(),
-        cell_act_file.data(),
-        cell_namespace.data(),
-        _mapped_file.data(),
-        expr_output_file.data());
+    cmd = "v2act -a -C \"" + expr_channel_type + "\" -l "+ cell_act_file + 
+          " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
   }
   else {
     if (!(tie_cells)) {
-      snprintf(cmd, char_buf_sz, "v2act -t -l %s -n %s %s >> %s",
-        cell_act_file.data(),
-        cell_namespace.data(),
-        _mapped_file.data(),
-        expr_output_file.data());
+      cmd = "v2act -t -l "+ cell_act_file + 
+            " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
     }
     else {
-      snprintf(cmd, char_buf_sz, "v2act -l %s -n %s %s >> %s",
-        cell_act_file.data(),
-        cell_namespace.data(),
-        _mapped_file.data(),
-        expr_output_file.data());
+      cmd = "v2act -l "+ cell_act_file + 
+            " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
     }
   }
   
   if (config_get_int("synth.expropt.verbose") == 2) {
-    printf("running: %s \n",cmd);
+    printf("running: %s \n",cmd.c_str());
   }
   else if (config_get_int("synth.expropt.verbose") == 1) {
     printf(".");
     fflush(stdout);
   }
 
-  int exec_failure = system(cmd);
+  int exec_failure = system(cmd.c_str());
   if (exec_failure != 0) {
-    fatal_error("external program call \"%s\" failed.", cmd);
+    fatal_error("external program call \"%s\" failed.", cmd.c_str());
   }
 }
 

@@ -127,7 +127,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
 
         int fd = lock_file(index_filename);
 
-        std::ofstream idx_file (index_filename.c_str(), std::ios::app);
+        std::ofstream idx_file (index_filename, std::ios::app);
         if (!idx_file) {
             std::cerr << "Error: could not create/open " << index_filename << std::endl;
             exit(1);
