@@ -340,7 +340,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
     /* rhs */
     buf = _gen_dummy_id(lidx);
-    fprintf (output_stream, "%s ? 1'b1 : 1'b0", buf.c_str());
+    fprintf (output_stream, "%s != 0", buf.c_str());
     break;
 
   case E_BUILTIN_INT:
