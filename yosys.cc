@@ -64,15 +64,14 @@ static struct cell_info {
 	  { "XOR2X1", 56, 0 }
 };
 
-static double parse_yosys_info (const char *file, double *area)
+static double parse_yosys_info (std::string file, double *area)
 {
-  char buf[char_buf_sz];
   FILE *fp;
   double ret;
   int i;
 
-  snprintf (buf, char_buf_sz, "%s.log", file);
-  fp = fopen (buf, "r");
+  std::string logfile = file + ".log";
+  fp = fopen (logfile.c_str(), "r");
   if (!fp) {
     return -1;
   }
@@ -86,6 +85,7 @@ static double parse_yosys_info (const char *file, double *area)
     *area = 0;
   }
 
+  char buf[char_buf_sz];
   while (fgets (buf, char_buf_sz, fp)) {
     if (strncmp (buf, "ABC:", 4) == 0) {
       char *tmp = strstr (buf, "Delay =");
@@ -150,7 +150,6 @@ extern "C"
 bool yosys_run (act_syn_info *s)
 {
   FILE *fp;
-  char *sdc_file;
   int len;
   int exec_failure;
 
@@ -159,35 +158,37 @@ bool yosys_run (act_syn_info *s)
     return false;
   }
 
-  if (s->v_in) {
-    len = strlen (s->v_in);
-  }
-  else {
-    len = 0;
-  }
+  len = s->v_in.size();
+  // if (s->v_in) {
+  //   len = strlen (s->v_in.c_str());
+  // }
+  // else {
+  //   len = 0;
+  // }
 
   if (len < 2 || s->v_in[len-1] != 'v' || s->v_in[len-2] != '.') {
     warning ("yosys_run: Verilog source should end in .v");
     return false;
   }
   
-  MALLOC (sdc_file, char, len+3);
-  snprintf (sdc_file, len + 3, "%s", s->v_in);
-  snprintf (sdc_file + len - 2, 5, ".sdc");
+  std::string sdc_file = s->v_in;
+  sdc_file.pop_back();
+  sdc_file.pop_back();
+  sdc_file.append(".sdc");
 
-  fp = fopen (sdc_file, "w");
+  fp = fopen (sdc_file.c_str(), "w");
   if (!fp) {
-    fatal_error ("Could not open `%s' file!", sdc_file);
+    fatal_error ("Could not open `%s' file!", sdc_file.c_str());
   }
   fprintf (fp, "set_load %g\n", config_get_real ("synth.expropt.default_load"));
   fclose (fp);
 
   // yosys gets its script passed via stdin (very short)
-  char *libfile = config_get_string("synth.liberty.typical");
+  std::string libfile = config_get_string("synth.liberty.typical");
 
-  char cmd[char_buf_sz];
+  std::string cmd = "";
   
-  if (strcmp(libfile,"none") != 0) {
+  if (libfile=="none") {
     int constr = 0;
     int pos;
     if (config_exists ("expropt.abc.use_constraints")) {
@@ -197,51 +198,38 @@ bool yosys_run (act_syn_info *s)
     }
 
     // start of the script
-    pos = 0;
-    snprintf (cmd + pos, char_buf_sz - pos, 
-	      "echo \"read_verilog %s; "
-	      "synth -noabc -top %s; ",
-	      s->v_in, s->toplevel);
-    pos += strlen (cmd + pos);
+    cmd += ( "echo \"read_verilog " + s->v_in + " ;synth -noabc -top  " + s->toplevel + ";");
 
     // tech map
     if (constr) {
-      snprintf (cmd + pos, char_buf_sz - pos, "abc -constr %s -liberty %s; ",
-		sdc_file, libfile);
+      cmd += ("abc -constr " + sdc_file + " -liberty " + libfile + " ; ");
     }
     else {
-      snprintf (cmd + pos, char_buf_sz - pos, "abc -liberty %s; ", libfile);
+      cmd += ("abc -liberty " + libfile + " ; ");
     }
-    pos += strlen (cmd + pos);
 
     // tie cells
     if (s->use_tie_cells) {
-      snprintf (cmd + pos, char_buf_sz - pos, 
-		"hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; ");
-      pos += strlen (cmd + pos);
+      cmd += ("hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; ");
     }
 
     // write results
-    snprintf(cmd + pos, char_buf_sz - pos,
-	     "write_verilog -nohex -nodec %s;\" | yosys > %s.log",
-	     s->v_out, s->v_out);
+    cmd += ("write_verilog -nohex -nodec " + s->v_out + ";\" | yosys > " + s->v_out + ".log");
   }
   else {
     fatal_error("Please define \"liberty.typical\" in expropt configuration file");
   }
-
-  FREE (sdc_file);
   
   if (config_get_int("synth.expropt.verbose") == 2) {
-    printf("running: %s \n", cmd);
+    printf("running: %s \n", cmd.c_str());
   }
   else if (config_get_int("synth.expropt.verbose") == 1) {
     printf(".");
     fflush(stdout);
   }
-  exec_failure = system(cmd);
+  exec_failure = system(cmd.c_str());
   if (exec_failure != 0) {
-    fprintf (stderr, "ERROR: command `%s' failed.\n", cmd);
+    fprintf (stderr, "ERROR: command `%s' failed.\n", cmd.c_str());
     return false;
   }
   return true;
@@ -254,7 +242,7 @@ double yosys_get_metric (act_syn_info *s, expropt_metadata type)
   if (type == metadata_area || type == metadata_delay_typ) {
     double res, area;
 
-    res = parse_yosys_info (s->v_out, &area);
+    res = parse_yosys_info (s->v_out.c_str(), &area);
     if (type == metadata_area) {
       if (!config_exists ("expropt.abc.use_constraints") ||
 	  !(config_get_int ("expropt.abc.use_constraints") == 1)) {
@@ -274,25 +262,19 @@ double yosys_get_metric (act_syn_info *s, expropt_metadata type)
 extern "C"
 void yosys_cleanup (act_syn_info *s)
 {
-  char *sdc_file;
-  int len;
-  char cmd[char_buf_sz];
-
-  len = strlen (s->v_in);
-  MALLOC (sdc_file, char, len+3);
-  snprintf (sdc_file, len + 3, "%s", s->v_in);
-  snprintf (sdc_file + len - 2, 5, ".sdc");
+  std::string sdc_file = s->v_in;
+  sdc_file.pop_back();
+  sdc_file.pop_back();
+  sdc_file.append(".sdc");
   
-  snprintf(cmd, char_buf_sz, "rm %s && rm %s && rm %s && rm %s.* ",
-	   s->v_out, s->v_in, sdc_file, s->v_out);
+  std::string cmd = "rm " + s->v_out + " && rm " + s->v_in + " && rm " + sdc_file + " && rm " + s->v_out +".* ";
 
   if (config_get_int("synth.expropt.verbose") == 2) {
-    printf("running: %s \n", cmd);
+    printf("running: %s \n", cmd.c_str());
   }
   else if (config_get_int("synth.expropt.verbose") == 1) {
     printf(".");
     fflush(stdout);
   }
-  system(cmd);
-  FREE (sdc_file);
+  system(cmd.c_str());
 }

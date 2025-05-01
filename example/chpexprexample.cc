@@ -77,7 +77,7 @@ void chpexprexample::start_new_set ()
     search_var_in_expr (in_expr_bundle, (Expr *) list_value(li));
   }
   ExprBlockInfo* info;
-  // run the syntesis
+  // run the synthesis
   info = optimiser->run_external_opt(expr_set_name, in_expr_bundle, inexprmap, inwidthmap, out_expr_bundle, outexprmap, outwidthmap);
 
   printf("Generated block %s: Area: %e m2, Power: %e W, delay: %e s, max power: %e, min delay: %e, max delay: %e, static power: %e, dynamic power: %e (if 0 => circuit empty, extraction failed or corner not provided)\n", 
