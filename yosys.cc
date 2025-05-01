@@ -188,7 +188,7 @@ bool yosys_run (act_syn_info *s)
 
   std::string cmd = "";
   
-  if (libfile=="none") {
+  if (libfile!="none") {
     int constr = 0;
     int pos;
     if (config_exists ("expropt.abc.use_constraints")) {
