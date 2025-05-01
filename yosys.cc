@@ -198,23 +198,23 @@ bool yosys_run (act_syn_info *s)
     }
 
     // start of the script
-    cmd += ( "echo \"read_verilog " + s->v_in + " ;synth -noabc -top  " + s->toplevel + ";");
+    cmd =  cmd + "echo \"read_verilog " + s->v_in + "; synth -noabc -top  " + s->toplevel + ";";
 
     // tech map
     if (constr) {
-      cmd += ("abc -constr " + sdc_file + " -liberty " + libfile + " ; ");
+      cmd = cmd + " abc -constr " + sdc_file + " -liberty " + libfile + ";"; 
     }
     else {
-      cmd += ("abc -liberty " + libfile + " ; ");
+      cmd = cmd + " abc -liberty " + libfile + ";";
     }
 
     // tie cells
     if (s->use_tie_cells) {
-      cmd += ("hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; ");
+      cmd = cmd + " hilomap -hicell TIEHIX1 Y -locell TIELOX1 Y -singleton; ";
     }
 
     // write results
-    cmd += ("write_verilog -nohex -nodec " + s->v_out + ";\" | yosys > " + s->v_out + ".log");
+    cmd = cmd + " write_verilog -nohex -nodec " + s->v_out + ";\" | yosys > " + s->v_out + ".log";
   }
   else {
     fatal_error("Please define \"liberty.typical\" in expropt configuration file");
