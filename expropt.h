@@ -29,9 +29,6 @@
 #include "expr_info.h"
 #include <string.h>
 
-#include <filesystem>
-namespace fs = std::filesystem;
-
 static const int char_buf_sz = 1024*32;
 
 /**
