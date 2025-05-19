@@ -85,7 +85,7 @@ void ExternalExprOpt::_init_defaults ()
   config_set_default_string ("synth.expropt.captable", "none");
 
   // LEF files
-  config_set_default_string ("expropt.lef", "none");
+  config_set_default_string ("synth.expropt.lef", "none");
 
   // .lib files for other corners; omitted by default
   config_set_default_string ("synth.liberty.max_power", "none");

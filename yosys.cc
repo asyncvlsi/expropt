@@ -191,8 +191,8 @@ bool yosys_run (act_syn_info *s)
   if (libfile!="none") {
     int constr = 0;
     int pos;
-    if (config_exists ("expropt.abc.use_constraints")) {
-      if (config_get_int ("expropt.abc.use_constraints") == 1) {
+    if (config_exists ("synth.expropt.abc.use_constraints")) {
+      if (config_get_int ("synth.expropt.abc.use_constraints") == 1) {
 	constr = 1;
       }
     }
@@ -244,8 +244,8 @@ double yosys_get_metric (act_syn_info *s, expropt_metadata type)
 
     res = parse_yosys_info (s->v_out.c_str(), &area);
     if (type == metadata_area) {
-      if (!config_exists ("expropt.abc.use_constraints") ||
-	  !(config_get_int ("expropt.abc.use_constraints") == 1)) {
+      if (!config_exists ("synth.expropt.abc.use_constraints") ||
+	  !(config_get_int ("synth.expropt.abc.use_constraints") == 1)) {
 	return -1.0;
       }
       return area;
