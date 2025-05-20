@@ -38,11 +38,31 @@ expr_path to_expr_path (std::string x) {
 
 std::string ExprCache::get_cache_loc()
 {
+    std::string ret = "";
     if (config_exists("synth.expropt.cache.local")) {
-        return config_get_string ("synth.expropt.cache.local");
+        ret = config_get_string ("synth.expropt.cache.local");
     }
-    Assert (config_exists("synth.expropt.cache.global"), "Could not find global cache");
-    return config_get_string ("synth.expropt.cache.global");
+    else if (config_exists("synth.expropt.cache.global")) {
+        ret = config_get_string ("synth.expropt.cache.global");
+    }
+    else {
+        fatal_error ("Could not find local or global expression cache!");
+    }
+
+    if (mapper == "abc") {
+        ret.append("/abc");
+    }
+    else if (mapper == "yosys") {
+        ret.append("/yosys");
+    }
+    else if (mapper == "genus") {
+        ret.append("/genus");
+    }
+    else {
+        fatal_error ("Unsupported logic synthesis system!");
+    }
+
+    return ret;
 }
 
 ExprCache::~ExprCache()
