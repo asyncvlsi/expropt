@@ -590,18 +590,26 @@ void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
   // wire_type is not bool use the async mode the specify a wire type
   // as a channel.  skip if run was just for extraction of properties
   // => output filename empty
+
+  std::string techname = config_get_string ("net.name");
+  std::string techopt = "";
+  if (!(techname=="scmos"))
+  {
+    techopt = "-T"+techname;
+  }
+
   if (wire_encoding == qdi) {
     // QDI, so we don't add tie cells
-    cmd = "v2act -a -C \"" + expr_channel_type + "\" -l "+ cell_act_file + 
+    cmd = "v2act " + techopt + " -a -C \"" + expr_channel_type + "\" -l "+ cell_act_file + 
           " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
   }
   else {
     if (!(tie_cells)) {
-      cmd = "v2act -t -l "+ cell_act_file + 
+      cmd = "v2act " + techopt + " -t -l "+ cell_act_file + 
             " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
     }
     else {
-      cmd = "v2act -l "+ cell_act_file + 
+      cmd = "v2act " + techopt + " -l "+ cell_act_file + 
             " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
     }
   }
