@@ -591,12 +591,8 @@ void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
   // as a channel.  skip if run was just for extraction of properties
   // => output filename empty
 
-  std::string techname = config_get_string ("net.name");
-  std::string techopt = "";
-  if (!(techname=="scmos"))
-  {
-    techopt = "-T"+techname;
-  }
+  std::string techname = getenv("ACT_TECH");
+  std::string techopt = "-T"+techname;
 
   if (wire_encoding == qdi) {
     // QDI, so we don't add tie cells
