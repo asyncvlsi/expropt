@@ -508,12 +508,13 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
   }
   auto stop_mapper = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop_mapper - start_mapper);
-  auto ebi = backend(mapped_file, io_duration, duration);
+  auto ebi = backend(mapped_file, verilog_file, io_duration, duration);
   if (__cleanup) cleanup_tmp_files();
   return ebi;
 }
 
 ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
+                                        std::string _unmapped_file,
                                 std::chrono::microseconds io_duration,
                                 std::chrono::microseconds duration)
 {
@@ -577,6 +578,7 @@ ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
               duration.count(),
               io_duration.count(),
               _mapped_file,
+              _unmapped_file,
               ""
               );
 

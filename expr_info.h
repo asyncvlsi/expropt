@@ -104,6 +104,7 @@ private:
     metric_triplet total_power;	//<  total power (W)
     long long mapper_runtime; //<  logic synthesis tool runtime (us)
     long long interface_runtime; //< interface tools (verilog_printing + v2act) runtime (us)
+    std::string unmapped_file; //< unmapped (pre-synthesis) verilog file
     std::string mapped_file; //< mapped verilog file
     std::string unique_id; //< unique id for the generated expression (cache only)
 
@@ -123,6 +124,7 @@ public:
     long long getRuntime() { return mapper_runtime; }
     long long getIORuntime() { return interface_runtime; }
     std::string getMappedFile() { return mapped_file; }
+    std::string getUnmappedFile() { return unmapped_file; }
     std::string getID() { return unique_id; }
     void setID(std::string s) { unique_id = s; }
 
@@ -139,6 +141,7 @@ public:
         const long long e_runtime,
         const long long e_io_runtime,
         std::string e_mapped_file,
+        std::string e_unmapped_file,
         std::string e_unique_id) :
         delay{e_delay},
         total_power{e_power},
@@ -148,6 +151,7 @@ public:
         mapper_runtime{e_runtime},
         interface_runtime{e_io_runtime},
         mapped_file{e_mapped_file},
+        unmapped_file{e_unmapped_file},
         unique_id{e_unique_id}
     { }
                         
