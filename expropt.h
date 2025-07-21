@@ -310,7 +310,7 @@ protected:
   act_syn_info __syn;
 
   void run_v2act(std::string, bool);
-  ExprBlockInfo *backend(std::string, std::chrono::microseconds, std::chrono::microseconds);
+  ExprBlockInfo *backend(std::string, std::string, std::chrono::microseconds, std::chrono::microseconds);
   
   /**
    * print the verilog module, internal takes the inputs and outputs as lists of expressions (plus the properites name and width as maps). 
