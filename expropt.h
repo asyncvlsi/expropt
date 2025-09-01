@@ -182,7 +182,16 @@ public:
 				   list_t *in_expr_list,
 				   iHashtable *in_expr_map,
 				   iHashtable *in_width_map,
-           bool __cleanup = true);
+           bool __cleanup = true)
+  {
+    return run_external_opt(std::to_string(expr_set_number), 
+                            targetwidth,
+                            e,
+                            in_expr_list,
+                            in_expr_map,
+                            in_width_map,
+                            __cleanup);
+  }
 
   /* 
    * Same as above but with string name
