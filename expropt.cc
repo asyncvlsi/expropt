@@ -225,97 +225,6 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_name,
   return info;
 }
 
-
-/*------------------------------------------------------------------------
- * Simplest expression optimization run
- *------------------------------------------------------------------------
- */
-ExprBlockInfo* ExternalExprOpt::run_external_opt (int expr_set_number,
-						  int targetwidth,
-						  Expr *expr,
-						  list_t *in_expr_list,
-						  iHashtable *in_expr_map,
-						  iHashtable *in_width_map,
-              bool __cleanup)
-{
-  // build the data structures needed
-
-  ExprBlockInfo* info;
-  iHashtable *outexprmap = ihash_new(0);
-  iHashtable *inexprmap = ihash_new(0);
-  iHashtable *outwidthmap = ihash_new(0);
-  list_t *outlist = list_new();
-
-  // convert input list, reverse searching nessesary, should always
-  // use last on multimatching
-  listitem_t *li;
-  Expr* e = NULL;
-  for (li = list_first (in_expr_list); li; li = list_next (li)) { 
-    e = (Expr *) list_value(li);
-    // change from int to C string
-    ihash_bucket_t *b_map,*b_new;
-    b_map = ihash_lookup(in_expr_map, (long) e);
-    char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
-    snprintf(charbuf, char_buf_sz, "%s%u",expr_prefix.c_str(),b_map->i);
-    b_new = ihash_add(inexprmap, (long) e);
-    b_new->v = charbuf;
-  }
-
-  ihash_bucket_t *b_map;
-  char *charbuf = (char *) malloc( sizeof(char) * ( char_buf_sz + 1 ) );
-
-  // the output should be called "out"
-  snprintf(charbuf,char_buf_sz, "out");
-  b_map = ihash_add(outexprmap,(long) expr);
-  b_map->v = charbuf;
-
-  // add the Expr * to the output list
-  list_append(outlist, expr);
-
-  // add the bitwidth to the bitwidth hash table
-  ihash_bucket_t *b_width;
-  b_width = ihash_add(outwidthmap,(long) expr);
-  b_width->i = targetwidth;
-
-  // generate module name 
-  std::string expr_set_name = module_prefix;
-  expr_set_name.append(std::to_string(expr_set_number));
-  
-  // and send off
-  info = run_external_opt(expr_set_name,
-			  in_expr_list,
-			  inexprmap,
-			  in_width_map,
-			  outlist,
-			  outexprmap,
-			  outwidthmap,
-        NULL,
-        __cleanup);
-
-  // after completerion clean up memory, the generated char names will
-  // leak they are not cleaned up atm.
-  list_free(outlist);
-  ihash_free(outwidthmap);
-
-  // delete the strings in outexprmap and inexprmap
-  ihash_iter_t it;
-  ihash_iter_init (outexprmap, &it); // ok this can be done in a much
-				     // simpler manner...
-  while ((b_map = ihash_iter_next (outexprmap, &it))) {
-    FREE (b_map->v);
-  }
-  ihash_free(outexprmap);
-
-  ihash_iter_init (inexprmap, &it);
-  while ((b_map = ihash_iter_next (inexprmap, &it))) {
-    FREE (b_map->v);
-  }
-  ihash_free(inexprmap);
-
-  return info;
-}
-
-
 /**
  * first constuct the filenames for the temporary files and than
  * generate the verilog, exc the external tool, read out the results
@@ -397,21 +306,6 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
               bool __cleanup)
 {
   ExprBlockInfo* info = NULL;
-
-  /*
-    Check if this call has been cached; if so, use the saved results!
-
-    Cache organization:
-
-     $ACT_CACHE -- if it exists, otherwise $HOME/.act_cache
-
-     For this, the cache is:
-        $ACT_CACHE/syn/<mapper>/$ACT_TECH/
-
-     index.db : list of proc names + metrics
-     <procname>.act : for each proc name
-  */
-
 
   // consruct files names for the temp files
   std::string verilog_file = "./";

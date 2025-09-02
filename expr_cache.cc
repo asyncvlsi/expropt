@@ -317,9 +317,9 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
         }
 
         std::chrono::microseconds dummy;
-        expr_output_file = _expr_file_path;
+        set_expr_outfile(_expr_file_path);
         backend(fn, fn_pre, dummy, dummy);
-        expr_output_file = "";
+        set_expr_outfile("");
         unlock_file(fd);
         runtime_accessed_set.insert(uniq_id);
     }

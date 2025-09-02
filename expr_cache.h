@@ -54,6 +54,10 @@ public:
     */
     std::string get_cache_loc ();
 
+    void set_expr_outfile(std::string x) {
+        expr_output_file = x;
+    }
+
 private:
 
     void read_cache ();
