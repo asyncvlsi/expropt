@@ -288,7 +288,7 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
         write_cache_index_line (uniq_id);
     }
 
-    if (!(runtime_accessed_set.contains(uniq_id)))
+    if (!(runtime_accessed_set.contains(uniq_id)) && !(_expr_file_path.empty()))
     {
         // for ( auto x : runtime_accessed_set ) {
         // fprintf (stdout, "\nMember: %s\n", x.c_str());
