@@ -313,7 +313,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   do {									\
     res = _gen_fresh_idx ();						\
     buf = _gen_dummy_id(res);					\
-    if (resw == 1) {							\
+    if (resw == 1 || resw==0) {							\
       fprintf (output_stream, "\twire %s;\n", buf.c_str());			\
     }									\
     else {								\
@@ -351,12 +351,8 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
       resw = e->u.e.r->u.ival.v;
     }
     if (resw==0) {
-      res = 0;
-      buf = _gen_dummy_id(res);
-      fprintf (output_stream, "\twire %s = 0", buf.c_str());
-      if (width) {							
-        *width = resw;							
-      }
+      DUMP_DECL_ASSIGN;
+      fprintf (output_stream, "0");
     }
     else {
       lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);

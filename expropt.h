@@ -426,7 +426,7 @@ protected:
       ret.append(std::to_string(idx));
       return ret;
     }
-    int _gen_fresh_idx () { return ++_dummy_idx; } // 0 reserved for int(0,0)
+    int _gen_fresh_idx () { return _dummy_idx++; }
 
     struct pHashtable *_Hexpr;
     struct pHashtable *_Hwidth;
