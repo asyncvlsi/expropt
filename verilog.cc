@@ -344,19 +344,26 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     break;
 
   case E_BUILTIN_INT:
-    lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
-    
     if (!e->u.e.r) {
       resw = 1;
     }
     else {
       resw = e->u.e.r->u.ival.v;
     }
-    DUMP_DECL_ASSIGN;
-
-    buf = _gen_dummy_id(lidx);
-    fprintf (output_stream, "%s", buf.c_str()); 
-    
+    if (resw==0) {
+      res = 0;
+      buf = _gen_dummy_id(res);
+      fprintf (output_stream, "\twire %s = 0", buf.c_str());
+      if (width) {							
+        *width = resw;							
+      }
+    }
+    else {
+      lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
+      DUMP_DECL_ASSIGN;
+      buf = _gen_dummy_id(lidx);
+      fprintf (output_stream, "%s", buf.c_str()); 
+    }
     break;
 
   case (E_QUERY):
@@ -614,8 +621,10 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
 	while (e) {
 	  lidx = print_expression (output_stream, e->u.e.l, exprmap, &lw);
-	  resw += lw;
-	  list_iappend (resl, lidx);
+    if (lw>0) {
+      resw += lw;
+      list_iappend (resl, lidx);
+    }
 	  e = e->u.e.r;
 	}
 	DUMP_DECL_ASSIGN;
