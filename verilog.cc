@@ -628,14 +628,19 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	  e = e->u.e.r;
 	}
 	DUMP_DECL_ASSIGN;
-	fprintf (output_stream, "{");
-	for (listitem_t *li = list_first (resl); li; li = list_next (li)) {
-    buf = _gen_dummy_id(list_ivalue (li));
-	  fprintf (output_stream, "%s", buf.c_str());
-	  if (list_next (li)) {
-	    fprintf (output_stream, ", ");
-	  }
-	}
+  if (list_isempty(resl)) {
+    fprintf (output_stream, "0");
+  }
+  else {
+    fprintf (output_stream, "{");
+    for (listitem_t *li = list_first (resl); li; li = list_next (li)) {
+      buf = _gen_dummy_id(list_ivalue (li));
+      fprintf (output_stream, "%s", buf.c_str());
+      if (list_next (li)) {
+        fprintf (output_stream, ", ");
+      }
+    }
+  }
 	fprintf (output_stream, "}");
       }
       break;
