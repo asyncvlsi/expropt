@@ -85,6 +85,9 @@ static double parse_abc_info (std::string file, double *area)
   std::string logfile = file + ".log";
   fp = fopen (logfile.c_str(), "r");
   if (!fp) {
+    if (area) {
+      *area = 0;
+    }
     return -1;
   }
 

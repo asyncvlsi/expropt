@@ -418,7 +418,7 @@ ExprBlockInfo *ExternalExprOpt::backend(std::string _mapped_file,
   // => output filename empty
   if (!expr_output_file.empty()) {
     auto start_v2act = high_resolution_clock::now();
-    run_v2act(_mapped_file, __syn.use_tie_cells);
+    run_v2act(_mapped_file, use_tie_cells);
     auto stop_v2act = high_resolution_clock::now();
     io_duration += duration_cast<microseconds>(stop_v2act - start_v2act);
   }
