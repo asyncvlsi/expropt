@@ -545,6 +545,10 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	  resw = act_expr_intwidth (e->u.ival.v);
 	}
 	DUMP_DECL_ASSIGN;
+  if (resw==0) {
+	  fprintf (output_stream, "1'b0");
+  }
+  else {
 	if (bi) {
 	  fprintf (output_stream, "%d'b", resw);
 	  bi->bitPrint (output_stream);
@@ -552,6 +556,7 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	else {
 	  fprintf(output_stream, "%d'h%lx", resw, e->u.ival.v);
 	}
+  }
       }
     }
     break;
