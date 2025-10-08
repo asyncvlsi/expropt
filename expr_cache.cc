@@ -49,6 +49,9 @@ std::string ExprCache::get_cache_loc()
         fatal_error ("Could not find local or global expression cache!");
     }
 
+    std::string techname = getenv("ACT_TECH");
+    ret.append("/"+techname);
+
     if (mapper == "abc") {
         ret.append("/abc");
     }
