@@ -70,10 +70,31 @@ std::string ExprCache::get_cache_loc()
 
 ExprCache::~ExprCache()
 {
-  if (_syn_dlib) {
-    dlclose (_syn_dlib);
-    _syn_dlib = NULL;
-  }
+    // save info for the ones to write out on exit
+    std::unordered_map<std::string, expr_path> path_map_save;
+    std::unordered_map<expr_path, ExprBlockInfo> info_map_save;
+    for ( auto x : dump_at_exit ) {
+        path_map_save.insert({x, path_map.at(x)});
+        info_map_save.insert({path_map_save.at(x), info_map.at(path_map_save.at(x))});
+    }
+
+    // clear maps and re-read coz someone else might have changed index file
+    int idx_fd = lock_file(index_file);
+    path_map.clear(); info_map.clear();
+    read_cache_unlocked(); 
+    for ( auto x : dump_at_exit ) {
+        if (!path_map.count(x)) {
+            path_map.insert({x, path_map_save.at(x)});
+            info_map.insert({path_map.at(x), info_map_save.at(path_map.at(x))});
+            write_cache_index_line_unlocked(x);
+        }
+    }
+    unlock_file(idx_fd);
+
+    if (_syn_dlib) {
+        dlclose (_syn_dlib);
+        _syn_dlib = NULL;
+    }
 }
 
 int ExprCache::lock_file (std::string fn)
@@ -234,6 +255,7 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
     }
     // gotta synth and add to cache
     else {
+        int idx_fd = lock_file(index_file);
         ExprBlockInfo *ebi = run_external_opt(uniq_id, targetwidth, expr, 
                                 in_expr_list, in_expr_map, in_width_map, false);
         ebi->setID(uniq_id);
@@ -288,7 +310,8 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
         unlock_file(fd2);
 
         cleanup_tmp_files();
-        write_cache_index_line (uniq_id);
+        unlock_file(idx_fd);
+        // write_cache_index_line (uniq_id);
     }
 
     if (!(runtime_accessed_set.contains(uniq_id)) && !(_expr_file_path.empty()))
@@ -327,6 +350,8 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
         runtime_accessed_set.insert(uniq_id);
     }
 
+    dump_at_exit.insert(uniq_id);
+
     ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
     ExprBlockInfo *ebi = new ExprBlockInfo(eb);
     return ebi;
@@ -359,9 +384,8 @@ void ExprCache::rename_and_pipe (std::ifstream &src,
     }
 }
 
-void ExprCache::read_cache()
+void ExprCache::read_cache_unlocked()
 {
-    int fd = lock_file(index_file);
     std::ifstream idx_file(index_file);
     if (!idx_file.is_open()) {
         std::cerr << "Error: Could not open cache index file (" << index_file << ") for reading.\n";
@@ -377,6 +401,12 @@ void ExprCache::read_cache()
         read_cache_index_line(line);
         cache_counter++;
     }
+}
+
+void ExprCache::read_cache()
+{
+    int fd = lock_file(index_file);
+    read_cache_unlocked();
     unlock_file(fd);
 }
 
@@ -422,6 +452,12 @@ void ExprCache::read_cache_index_line (std::string line) {
 void ExprCache::write_cache_index_line (std::string uniq_id)
 {
     int fd = lock_file(index_file);
+    write_cache_index_line_unlocked(uniq_id);
+    unlock_file(fd);
+}
+
+void ExprCache::write_cache_index_line_unlocked (std::string uniq_id)
+{
     std::ofstream idx_file (index_file, std::ios::app);
 
     Assert (path_map.contains(uniq_id), "Expr not in cache");
@@ -441,5 +477,4 @@ void ExprCache::write_cache_index_line (std::string uniq_id)
     idx_file << std::endl;
 
     idx_file.close();
-    unlock_file(fd);
 }

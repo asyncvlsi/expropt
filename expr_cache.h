@@ -61,8 +61,10 @@ public:
 private:
 
     void read_cache ();
+    void read_cache_unlocked ();
     void read_cache_index_line (std::string);
     void write_cache_index_line (std::string);
+    void write_cache_index_line_unlocked (std::string);
     void rename_and_pipe (std::ifstream &, std::ofstream &, 
                             const std::vector<std::string>, 
                             const std::vector<std::string>);
@@ -104,5 +106,7 @@ private:
     // Keep track of which exprs have already been copied over
     // To avoid double-defining the same expr blk
     std::unordered_set<std::string> runtime_accessed_set;
+    
+    std::unordered_set<std::string> dump_at_exit;
 
 };
