@@ -183,7 +183,7 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
             idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
             idx_file.close();
         }
-
+        fs::permissions(index_filename, fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::group_write, fs::perm_options::add);
         unlock_file(fd);
     }
     index_file = index_filename;
@@ -310,7 +310,8 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
             exit(1);
         }
         rename_and_pipe(sourceFile2, destFile2, {}, {});
-
+        fs::permissions(fn    , fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::group_write, fs::perm_options::add);
+        fs::permissions(fn_pre, fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::group_write, fs::perm_options::add);
         unlock_file(fd);
         unlock_file(fd2);
 
