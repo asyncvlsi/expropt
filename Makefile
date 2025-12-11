@@ -26,7 +26,7 @@ TARGETLIBS=$(LIB) $(SHLIB) \
 	act_extsyn_yosys.so \
 	act_extsyn_abc.so
 
-TARGETINCS=expr_cache.h expropt.h expr_info.h abc_api.h
+TARGETINCS=expr_cache.h expropt.h expr_info.h
 
 TARGETINCSUBDIR=act
 
