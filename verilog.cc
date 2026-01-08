@@ -67,12 +67,6 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   struct Hashtable *repeats;
   repeats = hash_new (4);
   for (li = list_first (in_list); li; li = list_next (li)) {
-    if (first) {
-      first=false;
-    }
-    else {
-      fprintf(output_stream, ", ");
-    }
     std::string current =
       (char *) ihash_lookup(inexprmap, (long) list_value (li))->v;
     
@@ -86,8 +80,10 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
     }
     
     if (!skip) {
+      if (!first) fprintf(output_stream, ", ");
       fprintf(output_stream, "%s", current.c_str());
       list_append (all_names, current.c_str());
+      first = false;
     }
   }
   hash_free (repeats);
@@ -96,12 +92,6 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   listitem_t *li_name = list_first (out_expr_name_list);
   repeats = hash_new (4);
   for (li = list_first (out_list); li; li = list_next (li)) {
-    if (first) {
-      first=false;
-    }
-    else {
-      fprintf(output_stream, ", ");
-    }
     Assert(li_name, "output name list and output expr list dont have the same length");
     std::string current = (char *) list_value (li_name);
     bool skip = false;
@@ -112,8 +102,10 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       hash_add (repeats, current.c_str());
     }
     if (!skip) {
+      if (!first) fprintf(output_stream, ", ");
       fprintf(output_stream, "%s", current.c_str());
       list_append (all_names, current.c_str());
+      first = false;
     }
     li_name = list_next(li_name);
   }
