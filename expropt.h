@@ -202,7 +202,7 @@ public:
 				   list_t *in_expr_list,
 				   iHashtable *in_expr_map,
 				   iHashtable *in_width_map,
-           bool __cleanup = true);
+				   bool __cleanup = true);
 
   /**
    * Simple C-STRING MODE - set of expr - recomended mode - outputs are
@@ -251,7 +251,7 @@ public:
 				   iHashtable *out_expr_map,
 				   iHashtable *out_width_map,
 				   list_t *hidden_expr_list = NULL,
-           bool __cleanup = true);
+				   bool __cleanup = true);
 
   
   /**
@@ -304,7 +304,7 @@ public:
 				   iHashtable *out_width_map,
 				   list_t *hidden_expr_list = NULL,
 				   list_t *hidden_expr_name_list = NULL,
-           bool __cleanup = true);
+				   bool __cleanup = true);
 
 
 protected:
@@ -320,48 +320,56 @@ protected:
 
   void run_v2act(std::string, bool);
   ExprBlockInfo *backend(std::string, std::string, std::chrono::microseconds, std::chrono::microseconds);
-  
+
   /**
    * print the verilog module, internal takes the inputs and outputs as lists of expressions (plus the properites name and width as maps). 
    * In and out have to be seperate, because in the in case you mean the expression var itself and for the outputs what its assigned to.
-     * the optional hidden expression list works the same way, it will source the properties for its variables from in maps, and the assing to from the out maps.
-     * 
-     * @param output_stream the file its printed to, fatal error if file not open.
-     * @param expr_set_name the name of the verilog module
-     * @param in_list an act list of expr leaf data structures, they should be E_VAR and for bundled dat additional E_INT, E_TRUE, E_FALSE, ...
-     * @param inexprmap the map from pointer of the expr struct to char* strings, if a mapping for eg. E_INT is defind it will take precidence, E_VAR has to have a mapping
-     * @param inwidthmap the map for how many wires the expression is referencing to, so the width of the bus.
-     * @param out_list an act list for the full expression so the head of the data structure, that are outputs of module. 
-     * @param out_name_list an index alligned list containing char* strings, with the name the result of the expression is assinged to.
-     * @param outwidthmap the map from pointer of the expr struct to int, for the bus width of the output
-     * @param expr_list optional - like out_list just the assigns are not used on the outputs, they can be used leafs for the outputs again when using the same char* string name.
-     * @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of the expression is assinged to.
-     */
-    void print_expr_verilog (FILE *output_stream,
-			     std::string expr_set_name,
-			     list_t *in_list,
-			     iHashtable *inexprmap,
-			     iHashtable *inwidthmap,
-			     list_t *out_list,
-			     list_t *out_name_list,
-			     iHashtable *outwidthmap,
-			     list_t *expr_list = NULL,
-			     list_t *hidden_name_list = NULL);
+   * the optional hidden expression list works the same way, it will source the properties for its variables from in maps, and the assing to from the out maps.
+   * 
+   * @param output_stream the file its printed to, fatal error if file not open.
+   * @param expr_set_name the name of the verilog module
+   * @param in_list an act list of expr leaf data structures, they should be E_VAR and for bundled dat additional E_INT, E_TRUE, E_FALSE, ...
+   * @param inexprmap the map from pointer of the expr struct to char* strings, if a mapping for eg. E_INT is defind it will take precidence, E_VAR has to have a mapping
+   * @param inwidthmap the map for how many wires the expression is referencing to, so the width of the bus.
+   * @param out_list an act list for the full expression so the head of the data structure, that are outputs of module. 
+   * @param out_name_list an index alligned list containing char* strings, with the name the result of the expression is assinged to.
+   * @param outwidthmap the map from pointer of the expr struct to int, for the bus width of the output
+   * @param expr_list optional - like out_list just the assigns are not used on the outputs, they can be used leafs for the outputs again when using the same char* string name.
+   * @param hidden_name_list optinal - an index alligned list containing char* strings, with the name the result of the expression is assinged to.
+   */
+  void print_expr_verilog (FILE *output_stream,
+			   std::string expr_set_name,
+			   list_t *in_list,
+			   iHashtable *inexprmap,
+			   iHashtable *inwidthmap,
+			   list_t *out_list,
+			   list_t *out_name_list,
+			   iHashtable *outwidthmap,
+			   list_t *expr_list = NULL,
+			   list_t *hidden_name_list = NULL);
     
 
-    /**
-     * the recursive method to print the expression itself as the rhs of a verilog assign.
-     * 
-     * @param output_stream the file stream to be printed to
-     * @param e the expression to be printed to
-     * @param exprmap the in_expr_map containing the leaf mappings, E_VAR mappings are required, other leaf mappings are optional, but take precidence over
-     * printing the hard coded value. 
-     * @return the dummy idx that holds the result
-     */
-  int print_expression(FILE *output_stream, Expr *e, iHashtable *exprmap,
-		       int *width = NULL);
-
-
+  /**
+   * Convert an ACT expression into a Verilog expression, respecting
+   * all bit-width conventions. Note that this emits wire declarations
+   * as well as assign statements.
+   *
+   * @param fp is where the output should be generated
+   * @param e is the expression to be converted
+   * @param sc is the ACT scope, used to avoid naming conflicts. If
+   * NULL, this is ignored.
+   * @param prefix is the string prefix for temporary variable names
+   * @param idx is a pointer to an integer (must be non-NULL), used
+   * as the start index for temp var name generation
+   * @param leafmap is a map from leaf nodes (E_VAR/E_INT) to strings
+   * to be printed
+   * @return the index for prefix(idx) which holds the expression value.
+   */
+  static int printExpr (FILE *fp, Expr *e,
+			Scope *sc,
+			const char *prefix,
+			int *idx,
+			iHashtable *leafmap);
 
     /**
      * the output file name where all act results are appended too.
@@ -416,38 +424,37 @@ protected:
      */
     const expr_mapping_target wire_encoding;
 
-    /**
-     * used to generate dummy prefix for temp vars
-     */
-    char _dummy_prefix[10];
-    int _dummy_idx;
-    std::string _gen_dummy_id (int idx) {
-      std::string ret = _dummy_prefix;
-      ret.append(std::to_string(idx));
-      return ret;
-    }
-    int _gen_fresh_idx () { return _dummy_idx++; }
-
-    struct pHashtable *_Hexpr;
-    struct pHashtable *_Hwidth;
-
-    /**
-     * This must be an E_VAR
-     */
-    std::unordered_map<std::string, int> _varwidths;
-    int _get_bitwidth (Expr *e);
-
-    /**
-     * This is a boxed pointer to the abc API
-     */
-    void *_abc_api;
-
-    bool (*_syn_run) (act_syn_info *s);
-    double (*_syn_get_metric) (act_syn_info *s, expropt_metadata type);
-    void (*_syn_cleanup) (act_syn_info *s);
-    void *_syn_dlib;
 
     int _filenum;
+
+  /* internal helper function for printExpr() */
+  static int _printExpr (FILE *fp, Expr *e, Scope *sc,
+			 const char *prefix, int *idx,
+			 pHashtable *emap,
+			 pHashtable *wmap,
+			 iHashtable *leafmap,
+			 int *width);
+
+  /**
+   * used to generate dummy prefix for temp vars
+   */
+  char _dummy_prefix[10];
+  int _dummy_idx;
+  std::string _gen_dummy_id (int idx) {
+    std::string ret = _dummy_prefix;
+    ret.append(std::to_string(idx));
+    return ret;
+  }
+
+  /**
+   * This is a boxed pointer to the abc API
+   */
+  void *_abc_api;
+
+  bool (*_syn_run) (act_syn_info *s);
+  double (*_syn_get_metric) (act_syn_info *s, expropt_metadata type);
+  void (*_syn_cleanup) (act_syn_info *s);
+  void *_syn_dlib;
 };
 
 

@@ -25,6 +25,66 @@
 #include <common/int.h>
 #include <string.h>
 
+
+static void _collect_var_widths (std::unordered_map<std::string, int> *w,
+				 Expr *e,
+				 struct iHashtable *leafmap,
+				 struct pHashtable *H)
+{
+  ihash_bucket_t *b;
+  phash_bucket_t *pb;
+  if (!e) return;
+
+  switch (e->type) {
+  case E_INT:
+  case E_TRUE:
+  case E_FALSE:
+  case E_REAL:
+    break;
+
+  case E_PROBE:
+    break;
+
+  case E_VAR:
+    if (!phash_lookup (H, e)) {
+      std::string tmp;
+      b = ihash_lookup (leafmap, (long)e);
+      Assert (b, "Variable not found in varmap");
+      tmp = (char *)b->v;
+      if (w->find (tmp) != w->end()) {
+	pb = phash_add (H, e);
+	pb->i = (*w)[tmp];
+      }
+      else {
+	fatal_error ("Could not find bitwidth for variable %s!", (char *)b->v);
+      }
+    }
+    break;
+
+  case E_BITFIELD:
+    if (!phash_lookup (H, e->u.e.l)) {
+      std::string tmp;
+      b = ihash_lookup (leafmap, (long)e);
+      Assert (b, "Variable not found in varmap");
+      tmp = (char *)b->v;
+      if (w->find (tmp) != w->end()) {
+	pb = phash_add (H, e->u.e.l);
+	pb->i = (*w)[tmp];
+      }
+      else {
+	fatal_error ("Could not find bitwidth for variable %s!", (char *)b->v);
+      }
+    }
+    break;
+
+  default:
+    _collect_var_widths (w, e->u.e.l, leafmap, H);
+    _collect_var_widths (w, e->u.e.r, leafmap, H);
+    break;
+  }
+  return;
+}
+
 /*
  * print the verilog module with header, in and outputs. call the
  * expression print method for the assigns rhs.
@@ -42,8 +102,13 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
 {
   listitem_t *li;
   char dummy_char;
-  
+
   list_t *all_names = list_new ();
+
+  std::unordered_map<std::string, int> _varwidths;
+
+  struct pHashtable *_Hexpr;
+  struct pHashtable *_Hwidth;
 
   _Hexpr = phash_new (8);
   _Hwidth = phash_new (8);
@@ -167,6 +232,7 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   }
   hash_free (repeats);
 
+
   //the hidden logic statements
   repeats = hash_new (4);
   if (expr_list != NULL && hidden_expr_name_list != NULL && !list_isempty(expr_list) && !list_isempty(hidden_expr_name_list))
@@ -239,7 +305,12 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
       li_name = list_next(li_name);
       if (skip) continue;
      // also print the hidden assigns
-      int idx = print_expression(output_stream, e, inexprmap);
+
+      /* now walk through the expression, and save the variable widths */
+      _collect_var_widths (&_varwidths, e, inexprmap, _Hwidth);
+      int dummy_w;
+      int idx = _printExpr (output_stream, e, NULL, _dummy_prefix, &_dummy_idx,
+			    _Hexpr, _Hwidth, inexprmap, &dummy_w);
       auto buf = _gen_dummy_id(idx);
       fprintf(output_stream,"\tassign %s = %s;\n", current.c_str(), buf.c_str());
     }
@@ -252,7 +323,12 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   {
     Expr *e = (Expr*) list_value (li);
     std::string current = (char *) list_value (li_name);
-    int idx = print_expression(output_stream, e, inexprmap);
+
+    /* now walk through the expression, and save the variable widths */
+    _collect_var_widths (&_varwidths, e, inexprmap, _Hwidth);
+    int dummy_w;
+    int idx = _printExpr (output_stream, e, NULL, _dummy_prefix, &_dummy_idx,
+			  _Hexpr, _Hwidth, inexprmap, &dummy_w);
     auto buf = _gen_dummy_id(idx);
     fprintf(output_stream,"\tassign %s = %s;\n", current.c_str(), buf.c_str());
     li_name = list_next(li_name);
@@ -263,23 +339,87 @@ void ExternalExprOpt::print_expr_verilog (FILE *output_stream,
   phash_free (_Hwidth);
 }
 
-/*
- * the recusive print method for the act expression data structure. it
- * will use the hashtable expression map to get the IDs for the
- * variables and constants.
- * 
- * for the constants they can be either defined in the exprmap, than
- * they are printed as inputs (for dualrail systems) or if they are
- * not in the exprmap, they will be printed as a constant in verilog
- * for the tool to optimise and map to tiecells (for bundled data)
- * 
- * the keys for the exprmaps are the pointers of the e of type E_VAR
- * and optinal of E_INT, E_TRUE, E_FALSE (or E_REAL) for dualrail.  if
- * a mapping exsists for these leaf types the mapping will be prefered
- * over printing the value.
- */
-int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
-				      iHashtable *exprmap, int *width)
+static void _collect_vwidths (Scope *sc,
+			      struct pHashtable *H,
+			      struct pHashtable *tmp,
+			      Expr *e)
+{
+  phash_bucket_t *pb;
+  if (!sc || !e) return;
+
+  /* in case we have edags */
+  if (phash_lookup (tmp, e)) return;
+  pb = phash_add (tmp, e);
+
+  switch (e->type) {
+  case E_INT:
+  case E_TRUE:
+  case E_FALSE:
+  case E_REAL:
+  case E_PROBE:
+    break;
+
+  case E_VAR:
+    if (!phash_lookup (H, e)) {
+      ActId *id = (ActId *) e->u.e.l;
+      InstType *it = sc->FullLookup (id, NULL);
+      Assert (it, "ID not found in scope?!");
+      pb = phash_add (H, e);
+      pb->i = TypeFactory::totBitWidth (it);
+
+      if (id->isDynamicDeref()) {
+	// XXX: multi-dimensional arrays?!
+	_collect_vwidths (sc, H, tmp, id->arrayInfo()->getDeref(0));
+      }
+    }
+    break;
+
+  case E_BITFIELD:
+    if (!phash_lookup (H, e->u.e.l)) {
+      ActId *id = (ActId *) e->u.e.l;
+      InstType *it = sc->FullLookup (id, NULL);
+      Assert (it, "ID not found in scope?!");
+      pb = phash_add (H, e);
+      pb->i = TypeFactory::totBitWidth (it);
+    }
+    break;
+
+  default:
+    _collect_vwidths (sc, H, tmp, e->u.e.l);
+    _collect_vwidths (sc, H, tmp, e->u.e.r);
+    break;
+  }
+}
+
+
+int ExternalExprOpt::printExpr (FILE *fp, Expr *e, Scope *sc,
+				const char *prefix, int *idx,
+				iHashtable *leafmap)
+{
+  int ret;
+  int w;
+  struct pHashtable *emap, *wmap;
+
+  emap = phash_new (4);
+  wmap = phash_new (4);
+
+  _collect_vwidths (sc, wmap, emap, e);
+  phash_clear (emap);
+
+  ret = _printExpr (fp, e, sc, prefix, idx, emap, wmap, leafmap, &w);
+
+  phash_free (emap);
+  phash_free (wmap);
+
+  return ret;
+}
+
+int ExternalExprOpt::_printExpr (FILE *fp, Expr *e, Scope *sc,
+				 const char *prefix, int *idx,
+				 pHashtable *emap,
+				 pHashtable *wmap,
+				 iHashtable *leafmap,
+				 int *width)
 {
   int tmp;
   int lw, rw;
@@ -290,28 +430,47 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 
   phash_bucket_t *b;
 
-  b = phash_lookup (_Hexpr, e);
+  b = phash_lookup (emap, e);
   if (b) {
     phash_bucket_t *b2;
     // we need to set the bitwidth!
     if (width) {
-      b2 = phash_lookup (_Hwidth, e);
+      b2 = phash_lookup (wmap, e);
       *width = b2->i;
     }
     return b->i;
   }
 
+  auto gen_fresh_idx = [&] () -> int {
+    int ret;
+    if (sc) {
+      sc->findFresh (prefix, idx);
+      ret = *idx;
+    }
+    else {
+      ret = *idx;
+      *idx = *idx + 1;
+    }
+    return ret;
+  };
+
+  auto gen_dummy_id = [&] (int id) -> std::string {
+    std::string ret = prefix;
+    ret.append (std::to_string (id));
+    return ret;
+  };
+
 #define DUMP_DECL_ASSIGN						\
   do {									\
-    res = _gen_fresh_idx ();						\
-    buf = _gen_dummy_id(res);					\
+    res = gen_fresh_idx ();						\
+    buf = gen_dummy_id(res);					\
     if (resw == 1 || resw==0) {							\
-      fprintf (output_stream, "\twire %s;\n", buf.c_str());			\
+      fprintf (fp, "\twire %s;\n", buf.c_str());			\
     }									\
     else {								\
-      fprintf (output_stream, "\twire [%d:0] %s;\n", resw-1, buf.c_str());	\
+      fprintf (fp, "\twire [%d:0] %s;\n", resw-1, buf.c_str());	\
     }									\
-    fprintf (output_stream, "\tassign %s = ", buf.c_str());			\
+    fprintf (fp, "\tassign %s = ", buf.c_str());			\
     if (width) {							\
       *width = resw;							\
     }									\
@@ -321,18 +480,18 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   rw = -1;
 
   int vw = -1;
-  
+
   switch (e->type) {
   case E_BUILTIN_BOOL:
-    lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
-
+    lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+		       emap, wmap, leafmap, width);
     /* lhs, res has bitwidth 1 */
     resw = 1;
     DUMP_DECL_ASSIGN;
 
     /* rhs */
-    buf = _gen_dummy_id(lidx);
-    fprintf (output_stream, "%s != 0", buf.c_str());
+    buf = gen_dummy_id(lidx);
+    fprintf (fp, "%s != 0", buf.c_str());
     break;
 
   case E_BUILTIN_INT:
@@ -344,31 +503,35 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
     }
     if (resw==0) {
       DUMP_DECL_ASSIGN;
-      fprintf (output_stream, "0");
+      fprintf (fp, "0");
     }
     else {
-      lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
+      lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+			 emap, wmap, leafmap, &lw);
       DUMP_DECL_ASSIGN;
-      buf = _gen_dummy_id(lidx);
-      fprintf (output_stream, "%s", buf.c_str()); 
+      buf = gen_dummy_id(lidx);
+      fprintf (fp, "%s", buf.c_str());
     }
     break;
 
   case (E_QUERY):
-    tmp = print_expression (output_stream, e->u.e.l, exprmap, &lw);
-    lidx = print_expression (output_stream, e->u.e.r->u.e.l, exprmap, &lw);
-    ridx = print_expression (output_stream, e->u.e.r->u.e.r, exprmap, &rw);
+    tmp = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+		      emap, wmap, leafmap, &lw);
+    lidx = _printExpr (fp, e->u.e.r->u.e.l, sc, prefix, idx,
+		       emap, wmap, leafmap, &lw);
+    ridx = _printExpr (fp, e->u.e.r->u.e.r, sc, prefix, idx,
+		       emap, wmap, leafmap, &rw);
     resw = act_expr_bitwidth (e->type, lw, rw);
 
     DUMP_DECL_ASSIGN;
-    buf = _gen_dummy_id(tmp);
-    fprintf (output_stream, " %s ? ", buf.c_str());
-    buf = _gen_dummy_id(lidx);
-    fprintf (output_stream, " %s : ", buf.c_str());
-    buf = _gen_dummy_id(ridx);
-    fprintf (output_stream, " %s", buf.c_str());
+    buf = gen_dummy_id(tmp);
+    fprintf (fp, " %s ? ", buf.c_str());
+    buf = gen_dummy_id(lidx);
+    fprintf (fp, " %s : ", buf.c_str());
+    buf = gen_dummy_id(ridx);
+    fprintf (fp, " %s", buf.c_str());
     break;
-    
+
     /* no padding needed, binary */
   case (E_LT):
   case (E_GT):
@@ -383,76 +546,80 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   case (E_LSR):
   case (E_ASR):
   case (E_XOR):
-    lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
-    ridx = print_expression(output_stream, e->u.e.r, exprmap, &rw);
+    lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+		       emap, wmap, leafmap, &lw);
+    ridx = _printExpr (fp, e->u.e.r, sc, prefix, idx,
+		       emap, wmap, leafmap, &rw);
 
     resw = act_expr_bitwidth (e->type, lw, rw);
     DUMP_DECL_ASSIGN;
 
-    buf = _gen_dummy_id(lidx);
-    fprintf(output_stream, "%s ", buf.c_str());
+    buf = gen_dummy_id(lidx);
+    fprintf(fp, "%s ", buf.c_str());
     if (e->type == E_AND) {
-      fprintf (output_stream, "&");
+      fprintf (fp, "&");
     }
     else if (e->type == E_OR) {
-      fprintf (output_stream, "|");
+      fprintf (fp, "|");
     }
     else if (e->type == E_XOR) {
-      fprintf (output_stream, "^");
+      fprintf (fp, "^");
     }
     else if (e->type == E_DIV) {
-      fprintf (output_stream, "/");
-    }      
+      fprintf (fp, "/");
+    }
     else if (e->type == E_MOD) {
-      fprintf (output_stream, "%%");
+      fprintf (fp, "%%");
     }
     else if (e->type == E_LSR) {
-      fprintf (output_stream, ">>");
+      fprintf (fp, ">>");
     }
     else if (e->type == E_ASR) {
-      fprintf (output_stream, ">>>");
+      fprintf (fp, ">>>");
     }
     else if (e->type == E_LT) {
-      fprintf (output_stream, "<");
+      fprintf (fp, "<");
     }
     else if (e->type == E_LT) {
-      fprintf (output_stream, "<");
+      fprintf (fp, "<");
     }
     else if (e->type == E_GT) {
-      fprintf (output_stream, ">");
+      fprintf (fp, ">");
     }
     else if (e->type == E_LE) {
-      fprintf (output_stream, "<=");
+      fprintf (fp, "<=");
     }
     else if (e->type == E_GE) {
-      fprintf (output_stream, ">=");
+      fprintf (fp, ">=");
     }
     else if (e->type == E_EQ) {
-      fprintf (output_stream, "==");
+      fprintf (fp, "==");
     }
     else if (e->type == E_NE) {
-      fprintf (output_stream, "!=");
+      fprintf (fp, "!=");
     }
-    buf = _gen_dummy_id(ridx);
-    fprintf(output_stream, " %s", buf.c_str());
+    buf = gen_dummy_id(ridx);
+    fprintf(fp, " %s", buf.c_str());
     break;
 
     /* unary */
   case (E_NOT):
   case (E_COMPLEMENT):
   case E_UMINUS:
-    lidx = print_expression(output_stream, e->u.e.l, exprmap, &lw);
+    lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+		       emap, wmap, leafmap, &lw);
+    rw = 0;
     resw = act_expr_bitwidth (e->type, lw, rw);
     DUMP_DECL_ASSIGN;
 
     if (e->type == E_NOT || e->type == E_COMPLEMENT) {
-      fprintf(output_stream, "~");
+      fprintf(fp, "~");
     }
     else if (e->type == E_UMINUS) {
-      fprintf(output_stream, "-");
+      fprintf(fp, "-");
     }
-    buf = _gen_dummy_id(lidx);
-    fprintf (output_stream, "%s", buf.c_str());
+    buf = gen_dummy_id(lidx);
+    fprintf (fp, "%s", buf.c_str());
     break;
 
     /* padding needed */
@@ -460,72 +627,79 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
   case (E_MINUS):
   case (E_MULT):
   case (E_LSL):
-    lidx = print_expression (output_stream, e->u.e.l, exprmap, &lw);
-    ridx = print_expression (output_stream, e->u.e.r, exprmap, &rw);
+    lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+		       emap, wmap, leafmap, &lw);
+    ridx = _printExpr (fp, e->u.e.r, sc, prefix, idx,
+		       emap, wmap, leafmap, &rw);
     resw = act_expr_bitwidth (e->type, lw, rw);
 
     /* pad left */
     DUMP_DECL_ASSIGN;
-    buf = _gen_dummy_id(lidx);
+    buf = gen_dummy_id(lidx);
     if (lw < resw) {
-      fprintf (output_stream, "{%d'b", resw-lw);
+      fprintf (fp, "{%d'b", resw-lw);
       for (int i=0; i < resw-lw; i++) {
-	fprintf (output_stream, "0");
+	fprintf (fp, "0");
       }
-      fprintf (output_stream, ",%s};\n", buf.c_str());
+      fprintf (fp, ",%s};\n", buf.c_str());
     }
     else if (lw > resw) {
-      fprintf (output_stream, "%s[%d:0]", buf.c_str(), resw-1);
+      fprintf (fp, "%s[%d:0]", buf.c_str(), resw-1);
     }
     else {
-      fprintf (output_stream, "%s;\n", buf.c_str());
+      fprintf (fp, "%s;\n", buf.c_str());
     }
     lidx = res;
 
     DUMP_DECL_ASSIGN;
-    buf = _gen_dummy_id(ridx);
+    buf = gen_dummy_id(ridx);
     if (rw < resw) {
-      fprintf (output_stream, "{%d'b", resw-rw);
+      fprintf (fp, "{%d'b", resw-rw);
       for (int i=0; i < resw-rw; i++) {
-	fprintf (output_stream, "0");
+	fprintf (fp, "0");
       }
-      fprintf (output_stream, ",%s};\n", buf.c_str());
+      fprintf (fp, ",%s};\n", buf.c_str());
     }
     else if (rw > resw) {
-      fprintf (output_stream, "%s[%d:0]", buf.c_str(), resw-1);
+      fprintf (fp, "%s[%d:0]", buf.c_str(), resw-1);
     }
     else {
-      fprintf (output_stream, "%s;\n", buf.c_str());
+      fprintf (fp, "%s;\n", buf.c_str());
     }
     ridx = res;
-    
+
     DUMP_DECL_ASSIGN;
-    buf = _gen_dummy_id(lidx);
-    fprintf(output_stream, "%s ", buf.c_str());
+    buf = gen_dummy_id(lidx);
+    fprintf(fp, "%s ", buf.c_str());
     if (e->type == E_PLUS) {
-      fprintf (output_stream, "+");
+      fprintf (fp, "+");
     }
     else if (e->type == E_MINUS) {
-      fprintf (output_stream, "-");
+      fprintf (fp, "-");
     }
     else if (e->type == E_MULT) {
-      fprintf (output_stream, "*");
+      fprintf (fp, "*");
     }
     else if (e->type == E_LSL) {
-      fprintf (output_stream, "<<");
-    }      
-    buf = _gen_dummy_id(ridx);
-    fprintf (output_stream, " %s", buf.c_str());
+      fprintf (fp, "<<");
+    }
+    buf = gen_dummy_id(ridx);
+    fprintf (fp, " %s", buf.c_str());
     break;
 
     case (E_INT):
     {
       ihash_bucket_t *b;
-      b = ihash_lookup (exprmap, (long)(e));
+      if (leafmap) {
+	b = ihash_lookup (leafmap, (long)(e));
+      }
+      else {
+	b = NULL;
+      }
       if (b) {
 	resw = 64;
 	DUMP_DECL_ASSIGN;
-	fprintf(output_stream, "%s", (char *)b->v);
+	fprintf(fp, "%s", (char *)b->v);
 	warning ("Int bitwidth unspecified");
       }
       else {
@@ -537,55 +711,91 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	  resw = act_expr_intwidth (e->u.ival.v);
 	}
 	DUMP_DECL_ASSIGN;
-  if (resw==0) {
-	  fprintf (output_stream, "1'b0");
-  }
-  else {
-	if (bi) {
-	  fprintf (output_stream, "%d'b", resw);
-	  bi->bitPrint (output_stream);
+	if (resw==0) {
+	  fprintf (fp, "1'b0");
 	}
 	else {
-	  fprintf(output_stream, "%d'h%lx", resw, e->u.ival.v);
+	  if (bi) {
+	    fprintf (fp, "%d'b", resw);
+	    bi->bitPrint (fp);
+	  }
+	  else {
+	    fprintf(fp, "%d'h%lx", resw, e->u.ival.v);
+	  }
 	}
-  }
       }
     }
     break;
-    
-    case (E_VAR):
+
+  case (E_VAR):
     {
       ihash_bucket_t *b;
-      std::string tmp;
-      b = ihash_lookup (exprmap, (long)(e));
-      Assert (b, "variable not found in variable map");
-      tmp = (char *)b->v;
-      if (_varwidths.find (tmp) != _varwidths.end()) {
-	resw = _varwidths[tmp];
-	DUMP_DECL_ASSIGN;
-	fprintf (output_stream, "%s", (char *)b->v);
+      phash_bucket_t *pb;
+
+      if (leafmap) {
+	b = ihash_lookup (leafmap, (long)(e));
+	Assert (b, "variable not found in variable map");
       }
       else {
-	fatal_error ("Could not find bitwidth for variable %s!\n", (char *)b->v);
+	b = NULL;
+      }
+      pb = phash_lookup (wmap, e);
+      if (pb) {
+	resw = pb->i;
+	ActId *tmpid = (ActId *)e->u.e.l;
+	if (!b && tmpid->isDynamicDeref()) {
+	  int index_w;
+	  int index_id =
+	    _printExpr (fp, tmpid->arrayInfo()->getDeref (0),
+			sc, prefix, idx, emap, wmap, leafmap, &index_w);
+	  DUMP_DECL_ASSIGN;
+
+	  /* strip out array and print it separately */
+	  Array *ta = tmpid->arrayInfo();
+	  tmpid->setArray (NULL);
+	  fprintf (fp, "\\");
+	  tmpid->Print (fp);
+	  fprintf (fp, " ");
+	  tmpid->setArray (ta);
+
+	  buf = gen_dummy_id (index_id);
+	  fprintf (fp, "[%s]", buf.c_str());
+	}
+	else {
+	  DUMP_DECL_ASSIGN;
+	  if (b) {
+	    fprintf (fp, "%s", (char*)b->v);
+	  }
+	  else {
+	    // it's actually a simple ID!
+	    fprintf (fp,  "\\");
+	    tmpid->Print (fp);
+	    fprintf (fp, " ");
+	  }
+	}
+      }
+      else {
+	fatal_error ("Could not find bitwidth for variable %s!\n",
+		     b ? (char *)b->v : "??");
       }
     }
     break;
-    
+
     case (E_LPAR):
       fatal_error("LPAR %u not implemented", e->type);
       break;
     case (E_RPAR):
       fatal_error("RPAR %u not implemented", e->type);
       break;
-      
+
     case (E_TRUE):
     {
       ihash_bucket_t *b;
       resw = 1;
       DUMP_DECL_ASSIGN;
-      b = ihash_lookup (exprmap, (long)(e));
-      if (b) fprintf(output_stream, "%s", (char *)b->v);
-      else fprintf(output_stream, " 1'b1 ");
+      b = ihash_lookup (leafmap, (long)(e));
+      if (b) fprintf(fp, "%s", (char *)b->v);
+      else fprintf(fp, " 1'b1 ");
     }
     break;
     case (E_FALSE):
@@ -593,9 +803,9 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
       ihash_bucket_t *b;
       resw = 1;
       DUMP_DECL_ASSIGN;
-      b = ihash_lookup (exprmap, (long)(e));
-      if (b) fprintf(output_stream, "%s", (char *)b->v);
-      else fprintf(output_stream, " 1'b0 ");
+      b = ihash_lookup (leafmap, (long)(e));
+      if (b) fprintf(fp, "%s", (char *)b->v);
+      else fprintf(fp, " 1'b0 ");
     }
       break;
     case (E_COLON):
@@ -613,31 +823,32 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
 	list_t *resl = list_new ();
 
 	while (e) {
-	  lidx = print_expression (output_stream, e->u.e.l, exprmap, &lw);
-    if (lw>0) {
-      resw += lw;
-      list_iappend (resl, lidx);
-    }
+	  lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+			     emap, wmap, leafmap, &lw);
+	  if (lw>0) {
+	    resw += lw;
+	    list_iappend (resl, lidx);
+	  }
 	  e = e->u.e.r;
 	}
 	DUMP_DECL_ASSIGN;
-  if (list_isempty(resl)) {
-    fprintf (output_stream, "0");
-  }
-  else {
-    fprintf (output_stream, "{");
-    for (listitem_t *li = list_first (resl); li; li = list_next (li)) {
-      buf = _gen_dummy_id(list_ivalue (li));
-      fprintf (output_stream, "%s", buf.c_str());
-      if (list_next (li)) {
-        fprintf (output_stream, ", ");
-      }
-    }
-  }
-	fprintf (output_stream, "}");
+	if (list_isempty(resl)) {
+	  fprintf (fp, "0");
+	}
+	else {
+	  fprintf (fp, "{");
+	  for (listitem_t *li = list_first (resl); li; li = list_next (li)) {
+	    buf = gen_dummy_id(list_ivalue (li));
+	    fprintf (fp, "%s", buf.c_str());
+	    if (list_next (li)) {
+	      fprintf (fp, ", ");
+	    }
+	  }
+	}
+	fprintf (fp, "}");
       }
       break;
-      
+
     case (E_BITFIELD):
       unsigned int l;
       unsigned int r;
@@ -651,79 +862,74 @@ int ExternalExprOpt::print_expression(FILE *output_stream, Expr *e,
       }
       {
 	ihash_bucket_t *b;
+	phash_bucket_t *pb;
 	std::string tmp;
-	b = ihash_lookup (exprmap, (long)(e));
+	b = ihash_lookup (leafmap, (long)(e));
 	Assert (b, "variable not found in variable map");
 	tmp = (char *)b->v;
-	if (_varwidths.find (tmp) != _varwidths.end()) {
-	  vw = _varwidths[tmp];
-	  if (l >= _varwidths[tmp]) {
-	    l = _varwidths[tmp]-1;
+	pb = phash_lookup (wmap, e->u.e.l);
+	if (pb) {
+	  vw = pb->i;
+	  if (l >= pb->i) {
+	    l = pb->i - 1;
 	  }
 	}
 	else {
-	  fatal_error ("Could not find bitwidth for variable %s!\n", (char *)b->v);
+	  fatal_error ("Could not find bitwidth for variable %s!\n", tmp.c_str());
 	}
       }
       resw = l - r + 1;
       DUMP_DECL_ASSIGN;
       {
 	ihash_bucket_t *b;
-	b = ihash_lookup (exprmap, (long)(e));
+	b = ihash_lookup (leafmap, (long)(e));
 	Assert (b, "variable not found in variable map");
-	fprintf(output_stream, "%s", (char *)b->v);
+	fprintf(fp, "%s", (char *)b->v);
       }
       if (l == vw-1 && r == 0) {
 	// do nothing!
       }
       else {
-	fprintf(output_stream, " [");
+	fprintf(fp, " [");
 	if (l!=r) {
-	  fprintf(output_stream, "%i:", l);
-	  fprintf(output_stream, "%i", r);
+	  fprintf(fp, "%i:", l);
+	  fprintf(fp, "%i", r);
 	} else {
-	  fprintf(output_stream, "%i", r);
+	  fprintf(fp, "%i", r);
 	}
-	fprintf(output_stream, "]");
+	fprintf(fp, "]");
       }
       break;
 
     case (E_REAL):
-    {
       fatal_error ("No reals!");
-      ihash_bucket_t *b;
-      b = ihash_lookup (exprmap, (long)(e));
-      if (b) fprintf(output_stream, "%s", (char *)b->v);
-      else fprintf(output_stream, "64'd%lu", e->u.ival.v);
-    }
       break;
     case (E_RAWFREE):
-      fprintf(output_stream, "RAWFREE\n");
+      fprintf(fp, "RAWFREE\n");
       fatal_error("%u should have been handled else where", e->type);
       break;
     case (E_END):
-      fprintf(output_stream, "END\n");
+      fprintf(fp, "END\n");
       fatal_error("%u should have been handled else where", e->type);
       break;
     case (E_NUMBER):
-      fprintf(output_stream, "NUMBER\n");
+      fprintf(fp, "NUMBER\n");
       fatal_error("%u should have been handled else where", e->type);
       break;
     case (E_FUNCTION):
-      fprintf(output_stream, "FUNCTION\n");
+      fprintf(fp, "FUNCTION\n");
       fatal_error("%u should have been handled else where", e->type);
       break;
     default:
-      fprintf(output_stream, "Whaaat?! %i\n", e->type);
+      fprintf(fp, "Whaaat?! %i\n", e->type);
       break;
   }
-  fprintf (output_stream, ";\n");
-  b = phash_add (_Hexpr, orig_e);
+  fprintf (fp, ";\n");
+  b = phash_add (emap, orig_e);
   b->i = res;
-  if (width) {
-    b = phash_add (_Hwidth, orig_e);
+  if (width && orig_e->type != E_VAR) {
+    b = phash_add (wmap, orig_e);
     b->i = *width;
   }
   return res;
 }
-
