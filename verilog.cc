@@ -61,22 +61,6 @@ static void _collect_var_widths (std::unordered_map<std::string, int> *w,
     }
     break;
 
-  case E_BITFIELD:
-    if (!phash_lookup (H, e->u.e.l)) {
-      std::string tmp;
-      b = ihash_lookup (leafmap, (long)e);
-      Assert (b, "Variable not found in varmap");
-      tmp = (char *)b->v;
-      if (w->find (tmp) != w->end()) {
-	pb = phash_add (H, e->u.e.l);
-	pb->i = (*w)[tmp];
-      }
-      else {
-	fatal_error ("Could not find bitwidth for variable %s!", (char *)b->v);
-      }
-    }
-    break;
-
   default:
     _collect_var_widths (w, e->u.e.l, leafmap, H);
     _collect_var_widths (w, e->u.e.r, leafmap, H);
@@ -374,16 +358,6 @@ static void _collect_vwidths (Scope *sc,
     }
     break;
 
-  case E_BITFIELD:
-    if (!phash_lookup (H, e->u.e.l)) {
-      ActId *id = (ActId *) e->u.e.l;
-      InstType *it = sc->FullLookup (id, NULL);
-      Assert (it, "ID not found in scope?!");
-      pb = phash_add (H, e);
-      pb->i = TypeFactory::totBitWidth (it);
-    }
-    break;
-
   default:
     _collect_vwidths (sc, H, tmp, e->u.e.l);
     _collect_vwidths (sc, H, tmp, e->u.e.r);
@@ -460,26 +434,24 @@ int ExternalExprOpt::_printExpr (FILE *fp, Expr *e, Scope *sc,
     return ret;
   };
 
-#define DUMP_DECL_ASSIGN						\
-  do {									\
-    res = gen_fresh_idx ();						\
+#define DUMP_DECL_ASSIGN					\
+  do {								\
+    res = gen_fresh_idx ();					\
     buf = gen_dummy_id(res);					\
-    if (resw == 1 || resw==0) {							\
-      fprintf (fp, "\twire %s;\n", buf.c_str());			\
-    }									\
-    else {								\
+    if (resw == 1 || resw==0) {					\
+      fprintf (fp, "\twire %s;\n", buf.c_str());		\
+    }								\
+    else {							\
       fprintf (fp, "\twire [%d:0] %s;\n", resw-1, buf.c_str());	\
-    }									\
-    fprintf (fp, "\tassign %s = ", buf.c_str());			\
-    if (width) {							\
-      *width = resw;							\
-    }									\
+    }								\
+    fprintf (fp, "\tassign %s = ", buf.c_str());		\
+    if (width) {						\
+      *width = resw;						\
+    }								\
   } while (0)
 
   lw = -1;
   rw = -1;
-
-  int vw = -1;
 
   switch (e->type) {
   case E_BUILTIN_BOOL:
@@ -860,45 +832,24 @@ int ExternalExprOpt::_printExpr (FILE *fp, Expr *e, Scope *sc,
          l = (unsigned long) e->u.e.r->u.e.r->u.ival.v;
          r = l;
       }
-      {
-	ihash_bucket_t *b;
-	phash_bucket_t *pb;
-	std::string tmp;
-	b = ihash_lookup (leafmap, (long)(e));
-	Assert (b, "variable not found in variable map");
-	tmp = (char *)b->v;
-	pb = phash_lookup (wmap, e->u.e.l);
-	if (pb) {
-	  vw = pb->i;
-	  if (l >= pb->i) {
-	    l = pb->i - 1;
-	  }
-	}
-	else {
-	  fatal_error ("Could not find bitwidth for variable %s!\n", tmp.c_str());
-	}
-      }
       resw = l - r + 1;
+      if (width) {
+	*width = resw;
+      }
+      lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
+			 emap, wmap, leafmap, &lw);
+      
       DUMP_DECL_ASSIGN;
-      {
-	ihash_bucket_t *b;
-	b = ihash_lookup (leafmap, (long)(e));
-	Assert (b, "variable not found in variable map");
-	fprintf(fp, "%s", (char *)b->v);
+      buf = gen_dummy_id(lidx);
+      fprintf (fp, "%s", buf.c_str());
+      fprintf(fp, " [");
+      if (l!=r) {
+	fprintf(fp, "%i:", l);
+	fprintf(fp, "%i", r);
+      } else {
+	fprintf(fp, "%i", r);
       }
-      if (l == vw-1 && r == 0) {
-	// do nothing!
-      }
-      else {
-	fprintf(fp, " [");
-	if (l!=r) {
-	  fprintf(fp, "%i:", l);
-	  fprintf(fp, "%i", r);
-	} else {
-	  fprintf(fp, "%i", r);
-	}
-	fprintf(fp, "]");
-      }
+      fprintf(fp, "]");
       break;
 
     case (E_REAL):
