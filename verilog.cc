@@ -836,20 +836,40 @@ int ExternalExprOpt::_printExpr (FILE *fp, Expr *e, Scope *sc,
       if (width) {
 	*width = resw;
       }
+
       lidx = _printExpr (fp, e->u.e.l, sc, prefix, idx,
 			 emap, wmap, leafmap, &lw);
-      
-      DUMP_DECL_ASSIGN;
-      buf = gen_dummy_id(lidx);
-      fprintf (fp, "%s", buf.c_str());
-      fprintf(fp, " [");
-      if (l!=r) {
-	fprintf(fp, "%i:", l);
-	fprintf(fp, "%i", r);
-      } else {
-	fprintf(fp, "%i", r);
+
+      if (l >= lw) {
+	// invalid bitfield specifier
+	l = lw-1;
+	if (r > l) {
+	  // this is zero!
+	  resw = 1;
+	  DUMP_DECL_ASSIGN;
+	  fprintf (fp, "1'b0");
+	}
+	else {
+	  resw = l - r + 1;
+	  if (width) {
+	    *width = resw;
+	  }
+	}
       }
-      fprintf(fp, "]");
+
+      if (r <= l) {
+	DUMP_DECL_ASSIGN;
+	buf = gen_dummy_id(lidx);
+	fprintf (fp, "%s", buf.c_str());
+	fprintf(fp, " [");
+	if (l!=r) {
+	  fprintf(fp, "%i:", l);
+	  fprintf(fp, "%i", r);
+	} else {
+	  fprintf(fp, "%i", r);
+	}
+	fprintf(fp, "]");
+      }
       break;
 
     case (E_REAL):
