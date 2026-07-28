@@ -72,12 +72,12 @@ AbcApi::AbcApi ()
     exit (0);
   }
   else {
-    signal (SIGCHLD, _child_exit);
     _fd.from = child_to_parent[0];
     close (child_to_parent[1]);
     _fd.to = parent_to_child[1];
     close (parent_to_child[0]);
     _parent = true;
+    signal (SIGCHLD, _child_exit);
   }
 }
 
@@ -415,6 +415,8 @@ int AbcApi::startSession (const char *v_in, const char *v_out, const char *name)
 int AbcApi::endSession ()
 {
   Assert (_parent, "What?");
+  
+  signal (SIGCHLD, SIG_DFL);
   
   if (write (_fd.to, "$end$", 5) < 0) {
     return 0;
