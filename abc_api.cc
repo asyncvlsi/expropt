@@ -31,6 +31,12 @@
 #include <common/list.h>
 #include "abc_api.h"
 #include <ctype.h>
+#include <signal.h>
+
+static void _child_exit (int sig)
+{
+  fatal_error ("ABC: process exited with an unexpected error!");
+}
 
 AbcApi::AbcApi ()
 {
@@ -66,6 +72,7 @@ AbcApi::AbcApi ()
     exit (0);
   }
   else {
+    signal (SIGCHLD, _child_exit);
     _fd.from = child_to_parent[0];
     close (child_to_parent[1]);
     _fd.to = parent_to_child[1];
