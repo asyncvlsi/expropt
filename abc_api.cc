@@ -77,7 +77,6 @@ AbcApi::AbcApi ()
     _fd.to = parent_to_child[1];
     close (parent_to_child[0]);
     _parent = true;
-    signal (SIGCHLD, _child_exit);
   }
 }
 
@@ -387,6 +386,8 @@ int AbcApi::_check_ok ()
 int AbcApi::startSession (const char *v_in, const char *v_out, const char *name)
 {
   Assert (_parent,"What?");
+
+  signal (SIGCHLD, _child_exit);
 
   if (write (_fd.to, "$new$", 5) < 0) {
     return 0;
