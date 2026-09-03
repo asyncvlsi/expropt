@@ -144,15 +144,15 @@ public:
         std::string e_unmapped_file,
         std::string e_unique_id) :
         delay{e_delay},
-        total_power{e_power},
         static_power{e_static_power},
         dynamic_power{e_dynamic_power},
-        area{e_area},
+        total_power{e_power},
         mapper_runtime{e_runtime},
         interface_runtime{e_io_runtime},
-        mapped_file{e_mapped_file},
         unmapped_file{e_unmapped_file},
-        unique_id{e_unique_id}
+        mapped_file{e_mapped_file},
+        unique_id{e_unique_id},
+        area{e_area}
     { }
                         
     /**

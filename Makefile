@@ -19,7 +19,7 @@
 #
 #-------------------------------------------------------------------------
 
-LIB=libexpropt_$(EXT).a
+#LIB=libexpropt_$(EXT).a
 SHLIB=libexpropt_sh_$(EXT).so
 
 TARGETLIBS=$(LIB) $(SHLIB) \
