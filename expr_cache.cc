@@ -54,18 +54,13 @@ std::string ExprCache::get_cache_loc()
     std::string techname = getenv("ACT_TECH");
     ret.append("/"+techname);
 
-    if (mapper == "abc") {
-        ret.append("/abc.db");
+    if (!engineExists (mapper.c_str())) {
+      fatal_error ("Unsupported logic synthesis system!");
     }
-    else if (mapper == "yosys") {
-        ret.append("/yosys.db");
-    }
-    else if (mapper == "genus") {
-        ret.append("/genus.db");
-    }
-    else {
-        fatal_error ("Unsupported logic synthesis system!");
-    }
+
+    ret.append ("_");
+    ret.append (mapper);
+    ret.append (".db");
 
     return ret;
 }
