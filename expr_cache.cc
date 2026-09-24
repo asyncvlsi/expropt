@@ -620,10 +620,11 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
     sqlite3_exec (db, "COMMIT;", NULL, NULL, NULL);
   }
 
-  if (!runtime_accessed_set.contains (uniq_id)) {
+  if (!runtime_accessed_set.contains (uniq_id) && !_expr_file_path.empty()) {
     std::chrono::microseconds dummy;
     set_expr_outfile (_expr_file_path);
     auto *tmp = backend(ebi->getMappedFile(), "", dummy, dummy);
+    set_expr_outfile ("");
     delete tmp;
     runtime_accessed_set.insert(uniq_id);
   }
