@@ -173,6 +173,11 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
       sqlite3_finalize (stmt);
     }
     sqlite3_close (db);
+
+    fs::permissions(cache_path,
+		    fs::perms::owner_read | fs::perms::owner_write |
+		    fs::perms::group_read | fs::perms::group_write,
+		    fs::perm_options::add);
   }
 }
 
