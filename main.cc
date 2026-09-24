@@ -255,10 +255,15 @@ int main (int argc, char **argv)
   char *s;
   Act::Init (&argc, &argv);
   if (argc < 3) usage (argv[0]);
+
+  if (!ExternalExprOpt::engineExists (argv[1])) {
+    printf ("Error: synthesis engine for `%s' doesn't exist.\n", argv[1]);
+    exit (1);
+  }
+  
   ExprCache *ec = new ExprCache (argv[1], expr_mapping_target::qdi, false);
 
   std::string loc = ec->get_cache_loc();
-  std::cout << "Cache location: " << loc << std::endl;
 
   int rc;
   sqlite3 *db;
@@ -270,6 +275,7 @@ int main (int argc, char **argv)
       sqlite3_close (db);
       usage (argv[0]);
     }
+    std::cout << "Cache location: " << loc << std::endl;
     run_info (db);
   }
   else if (strcmp (argv[2], "getid") == 0) {
