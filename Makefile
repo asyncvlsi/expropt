@@ -18,11 +18,11 @@
 #  Boston, MA  02110-1301, USA.
 #
 #-------------------------------------------------------------------------
-
 #LIB=libexpropt_$(EXT).a
 SHLIB=libexpropt_sh_$(EXT).so
+TARGETS=expr_cache.$(EXT)
 
-TARGETLIBS=$(LIB) $(SHLIB) \
+TARGETLIBS=$(SHLIB) \
 	act_extsyn_yosys.so \
 	act_extsyn_abc.so
 
@@ -36,18 +36,19 @@ CPPSTD=c++20
 
 OBJS2=expr_cache.o expropt.o verilog.o abc_api.o 
 
-OBJS= $(OBJS2)
+OBJS=$(OBJS2) main.o
 
 RLIBS := -labc -lsqlite3
 RLIBS_SO := $(ACT_HOME)/lib/libabc.so -lsqlite3
 
-SHOBJS=$(OBJS:.o=.os)
+SHOBJS=$(OBJS2:.o=.os)
 
-SRCS= $(OBJS2:.o=.cc)
-
-#SUBDIRSPOST=test
+SRCS= $(OBJS2:.o=.cc) main.cc
 
 include $(ACT_HOME)/scripts/Makefile.std
+
+$(TARGETS): main.o $(SHLIB)
+	$(CXX) $(SH_EXE_OPTIONS) $(CFLAGS) main.o -o $(TARGETS) $(SHLIBACT) -lexpropt_sh -lsqlite3 -lz
 
 $(LIB): $(OBJS) 
 	ar ruv $(LIB) $(OBJS)
