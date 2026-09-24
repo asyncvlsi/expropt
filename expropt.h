@@ -204,6 +204,8 @@ public:
 				   iHashtable *in_width_map,
 				   bool __cleanup = true);
 
+  std::string gen_mapped_filename ();
+
   /**
    * Simple C-STRING MODE - set of expr - recomended mode - outputs are
    * unique.

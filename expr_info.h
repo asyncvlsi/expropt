@@ -52,7 +52,7 @@ struct metric_triplet {
     max_val = 0;
     found = false;
   }
-  
+
 /* Metrics typically have a range: typical value, min value, and max
  * value.
  */
@@ -96,6 +96,8 @@ struct act_syn_info {
   void *space;			// use for whatever you want!
 };
 
+class ExprCache;
+
 class ExprBlockInfo {
 private:
     metric_triplet delay;		//< delay value (s)
@@ -114,19 +116,19 @@ private:
     */
     double area;
 
-public:
-
-    metric_triplet getDelay() { return delay; }
-    metric_triplet getStaticPower() { return static_power; }
-    metric_triplet getDynamicPower() { return dynamic_power; }
-    metric_triplet getPower() { return total_power; }
-    double getArea() { return area; }
-    long long getRuntime() { return mapper_runtime; }
-    long long getIORuntime() { return interface_runtime; }
-    std::string getMappedFile() { return mapped_file; }
     std::string getUnmappedFile() { return unmapped_file; }
-    std::string getID() { return unique_id; }
+
+public:
+    metric_triplet getDelay() const { return delay; }
+    metric_triplet getStaticPower() const { return static_power; }
+    metric_triplet getDynamicPower() const { return dynamic_power; }
+    metric_triplet getPower() const { return total_power; }
+    double getArea() const { return area; }
+    long long getRuntime() const { return mapper_runtime; }
+    long long getIORuntime() const { return interface_runtime; }
+    std::string getID() const { return unique_id; }
     void setID(std::string s) { unique_id = s; }
+    std::string getMappedFile() const { return mapped_file; }
 
     /**
      * Construct a new Expr Block Info object, 
@@ -164,5 +166,6 @@ public:
     
     ~ExprBlockInfo() { }
 
-    bool exists() { return (area != -1); }
+    bool exists() const { return (area != -1); }
+    friend class ExprCache;
 };

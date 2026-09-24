@@ -59,54 +59,8 @@ public:
     }
 
 private:
-
-    void read_cache ();
-    void read_cache_unlocked ();
-    void read_cache_index_line (std::string);
-    void write_cache_index_line (std::string);
-    void write_cache_index_line_unlocked (std::string);
-    void rename_and_pipe (std::ifstream &, std::ofstream &, 
-                            const std::vector<std::string>, 
-                            const std::vector<std::string>);
-
-    void v2act_and_pipe (std::ifstream &src, std::ofstream &dst);
-
-    int lock_file (std::string);
-    void unlock_file (int);
-
     std::string _gen_unique_id (Expr *, iHashtable *, iHashtable *, int);
-
-    /*
-        define a next() function for the
-        expr_path type.
-    */
-    expr_path gen_expr_path () {
-        return cache_counter++;
-    }
-
     std::string path;
-    std::string index_file;
-
-    char idx_file_delimiter;
-    int n_metrics;
-    int n_cols;
-    int area_id;
-    int mapper_runtime_id;
-    int io_runtime_id;
-
     std::string _expr_file_path;
-
-    expr_path cache_counter;
-
-    // ID-to-path
-    std::unordered_map<std::string, expr_path> path_map;
-    // Path-to-info
-    std::unordered_map<expr_path, ExprBlockInfo> info_map;
-
-    // Keep track of which exprs have already been copied over
-    // To avoid double-defining the same expr blk
     std::unordered_set<std::string> runtime_accessed_set;
-    
-    std::unordered_set<std::string> dump_at_exit;
-
 };

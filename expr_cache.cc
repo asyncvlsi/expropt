@@ -27,7 +27,9 @@
 #include "expr_cache.h"
 #include <sys/file.h>   
 #include <fcntl.h>    
-#include <unistd.h>    
+#include <unistd.h>
+#include <sqlite3.h>
+#include <zlib.h>
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -53,13 +55,13 @@ std::string ExprCache::get_cache_loc()
     ret.append("/"+techname);
 
     if (mapper == "abc") {
-        ret.append("/abc");
+        ret.append("/abc.db");
     }
     else if (mapper == "yosys") {
-        ret.append("/yosys");
+        ret.append("/yosys.db");
     }
     else if (mapper == "genus") {
-        ret.append("/genus");
+        ret.append("/genus.db");
     }
     else {
         fatal_error ("Unsupported logic synthesis system!");
@@ -70,59 +72,10 @@ std::string ExprCache::get_cache_loc()
 
 ExprCache::~ExprCache()
 {
-    // save info for the ones to write out on exit
-    std::unordered_map<std::string, expr_path> path_map_save;
-    std::unordered_map<expr_path, ExprBlockInfo> info_map_save;
-    for ( auto x : dump_at_exit ) {
-        path_map_save.insert({x, path_map.at(x)});
-        info_map_save.insert({path_map_save.at(x), info_map.at(path_map_save.at(x))});
-    }
-
-    // clear maps and re-read coz someone else might have changed index file
-    int idx_fd = lock_file(index_file);
-    path_map.clear(); info_map.clear();
-    read_cache_unlocked(); 
-    for ( auto x : dump_at_exit ) {
-        if (!path_map.count(x)) {
-            path_map.insert({x, path_map_save.at(x)});
-            info_map.insert({path_map.at(x), info_map_save.at(path_map.at(x))});
-            write_cache_index_line_unlocked(x);
-        }
-    }
-    unlock_file(idx_fd);
-
-    if (_syn_dlib) {
-        dlclose (_syn_dlib);
-        _syn_dlib = NULL;
-    }
-}
-
-int ExprCache::lock_file (std::string fn)
-{
-    int fd = open(fn.c_str(), O_RDWR | O_CREAT, 0666);
-    if (fd == -1) { 
-        std::cerr << "Failed to open " << fn << "\n"; 
-        exit(1); 
-    }
-    if (flock(fd, LOCK_EX) == -1) { 
-        std::cerr << "Failed to lock " << fn << "\n"; 
-        close(fd); 
-        exit(1); 
-    }
-    return fd;
-}
-
-void ExprCache::unlock_file (int fd)
-{
-    bool fail = false;
-    if (flock(fd, LOCK_UN) == -1) { 
-        std::cerr << "Failed to unlock descriptor: " << fd << "\n"; 
-        fail = true;
-    }
-    close(fd);
-    if (fail) {
-        exit(1);
-    }
+  if (_syn_dlib) {
+    dlclose (_syn_dlib);
+    _syn_dlib = NULL;
+  }
 }
 
 ExprCache::ExprCache(const char *datapath_synthesis_tool,
@@ -137,72 +90,90 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
                       "in_",
                       "blk_") 
 {
-    _expr_file_path = expr_file_path;
-    path = get_cache_loc();
+  _expr_file_path = expr_file_path;
+  path = get_cache_loc();
+  runtime_accessed_set.clear ();
 
-    bool invalidate_cache = false;
-    if (config_exists("synth.expropt.cache.invalidate")) {
-        invalidate_cache = (config_get_int("synth.expropt.cache.invalidate") != 0);
-    }
+  bool invalidate_cache = false;
+  if (config_exists("synth.expropt.cache.invalidate")) {
+    invalidate_cache = (config_get_int("synth.expropt.cache.invalidate") != 0);
+  }
 
-    config_set_default_string("synth.expropt.cache.cell_lib_namespace", "syn");
+  config_set_default_string("synth.expropt.cache.cell_lib_namespace", "syn");
     
-    // things to find and replace when storing in cache
-    // just store the verilog file
+  // things to find and replace when storing in cache
+  // just store the verilog file
 
-    if (invalidate_cache) {
-        Assert(!(path.empty()), "what");
-        std::string del_files_cmd = std::string("rm ") + std::string(path) + std::string("/*.act");
-        std::string del_index_cmd = std::string("rm ") + std::string(path) + std::string("/expr.index");
-        system(del_files_cmd.c_str());
-        system(del_index_cmd.c_str());
+  if (invalidate_cache) {
+    Assert(!(path.empty()), "what");
+    std::string del_files_cmd = std::string("rm ") + std::string(path);
+    system(del_files_cmd.c_str());
+  }
+
+  fs::path cache_path = path;
+  if (!fs::exists(cache_path)) {
+    sqlite3 *db;
+    int rc;
+    rc = sqlite3_open(path.c_str(), &db);
+    if (rc) {
+      std::cerr << "Could not create cache: " << cache_path << std::endl;
+      sqlite3_close (db);
+      exit(1);
     }
 
-    fs::path cache_path = path;
-    if (!fs::exists(cache_path)) {
-        if (!(fs::create_directories(cache_path))) {
-            std::cerr << "Could not create directory" << cache_path << std::endl;
-            exit(1);
-        }
+    // now we create the tables
+    const char *sql[] = {
+      R"(CREATE TABLE IF NOT EXISTS
+	entries (
+            expr TEXT UNIQUE NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT ); )",
+      R"(CREATE TABLE IF NOT EXISTS
+        metrics (
+            id INTEGER PRIMARY KEY,
+            delay_min REAL,
+            delay_typ REAL,
+            delay_max REAL,
+            static_power_min REAL,
+            static_power_typ REAL,
+            static_power_max REAL,
+            dynamic_energy_min REAL,
+            dynamic_energy_typ REAL,
+            dynamic_energy_max REAL,
+            total_power_min REAL,
+            total_power_typ REAL,
+            total_power_max REAL,
+            area REAL,
+            mapper_runtime REAL,
+            io_runtime REAL ); )",
+      R"(CREATE TABLE IF NOT EXISTS
+        data (
+           id INTEGER PRIMARY KEY,
+           pre_v BLOB,
+           mapped_v BLOB
+        ); )",
+      NULL };
+
+    sqlite3_stmt *stmt;
+
+    for (int i=0; sql[i]; i++) {
+      rc = sqlite3_prepare_v2 (db, sql[i], -1, &stmt, NULL);
+      if (rc != SQLITE_OK) {
+	std::cerr << "Unexpected error in cache creation: " <<
+	  sqlite3_errmsg (db) << std::endl;
+	sqlite3_close (db);
+	exit (1);
+      }
+      rc = sqlite3_step (stmt);
+      if (rc != SQLITE_DONE) {
+	std::cerr << "Unexpected error in cache creation step: " <<
+	  sqlite3_errmsg (db) << std::endl;
+	sqlite3_close (db);
+	exit (1);
+      }
+      sqlite3_finalize (stmt);
     }
-
-    std::string index_filename = path + std::string("/expr.index");
-    if (!fs::exists(index_filename)) {
-        int fd = lock_file(index_filename);
-        if (!fs::exists(index_filename)) { // gotta check again
-            std::ofstream idx_file (index_filename, std::ios::app);
-            if (!idx_file) {
-                std::cerr << "Error: could not create/open " << index_filename << std::endl;
-                exit(1);
-            }
-            idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
-            idx_file << "# Expression cache index and metrics file" << std::endl;
-            idx_file << "# Metrics except area are in triplets (min,typ,max)" << std::endl;
-            idx_file << "# Format: <unique_id> <file_name> <delay> <static power> <dynamic power> <total power> <area> <mapper_runtime> <io_runtime>" << std::endl;
-            idx_file << "# Type: <string> <int> <double (s)> <double (W)> <double (W)> <double (W)> <double (W)> <mapper_runtime (us)> <io_runtime (us)>" << std::endl;
-            idx_file << "# ------------------------------------------------------------------------------------------------------------------------" << std::endl;
-            idx_file.close();
-        }
-        fs::permissions(index_filename, fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::group_write, fs::perm_options::add);
-        unlock_file(fd);
-    }
-    index_file = index_filename;
-    idx_file_delimiter = ' ';
-    path_map.clear();
-    runtime_accessed_set.clear();
-
-    // the number of metrics to store
-    n_metrics = 4;
-    area_id = 2 + (3*n_metrics);
-    mapper_runtime_id = 2 + (3*n_metrics) + 1;
-    io_runtime_id = 2 + (3*n_metrics) + 2;
-
-    // id, filename, 3 numbers for each metric (typ, min, max), area, mapper runtime, io runtime
-    n_cols = 2 + (3*n_metrics) + 1 + 2;
-
-    // initialize cache counter
-    cache_counter = 0;
-    read_cache();
+    sqlite3_close (db);
+  }
 }
 
 std::string ExprCache::_gen_unique_id (Expr *e, iHashtable *expr_map, 
@@ -240,247 +211,428 @@ std::string ExprCache::_gen_unique_id (Expr *e, iHashtable *expr_map,
     return uniq_id;
 }
 
+/**
+ * XXX: change this to incremental reading of a file and writing a blob.
+ **/
+static
+std::string gzString (const std::string &data)
+{
+  z_stream zs;
+  memset (&zs, 0, sizeof (zs));
+  if (deflateInit (&zs, Z_BEST_COMPRESSION) != Z_OK) {
+    std::cerr << "Compression error!" << std::endl;
+    exit (1);
+  }
+  zs.next_in = (Bytef*) data.data();
+  zs.avail_in = data.size ();
+  
+  int ret;
+  char outbuffer[1024];
+  std::string outstring;
+  do {
+    zs.next_out = (Bytef*) (outbuffer);
+    zs.avail_out = sizeof (outbuffer);
+    ret = deflate (&zs, Z_FINISH);
+    if (outstring.size() < zs.total_out) {
+      outstring.append (outbuffer, zs.total_out - outstring.size());
+    }
+  } while (ret == Z_OK);
+  deflateEnd (&zs);
+
+  if (ret != Z_STREAM_END) {
+    std::cerr << "Compression error!" << std::endl;
+    exit (1);
+  }    
+  return outstring;
+}
+
+
+/**
+ * XXX: change this to incremental reading of a blob and writing a
+ * file
+ **/
+static
+std::string guzString (const char *dat, int len)
+{
+  z_stream zs;
+  memset (&zs, 0, sizeof (zs));
+  if (inflateInit (&zs) != Z_OK) {
+    std::cerr << "Decompression error-start!" << std::endl;
+    exit (1);
+  }
+  zs.next_in = (Bytef*) dat;
+  zs.avail_in = len;
+  
+  int ret;
+  int have;
+  char outbuffer[1024];
+  std::string outstring;
+  do {
+    zs.next_out = (Bytef*) (outbuffer);
+    zs.avail_out = sizeof (outbuffer);
+    
+    ret = inflate (&zs, Z_NO_FLUSH);
+    have = sizeof (outbuffer) - zs.avail_out;
+    outstring.append (outbuffer, have);
+  } while (ret == Z_OK);
+  inflateEnd (&zs);
+
+  if (ret != Z_STREAM_END) {
+    std::cerr << "Decompression error-end!" << std::endl;
+    if (ret == Z_ERRNO) {
+      std::cerr << "stream error?" << std::endl;
+    }
+    else if (ret == Z_STREAM_ERROR) {
+      std::cerr << "invalid compression level" << std::endl;
+    }
+    else if (ret == Z_DATA_ERROR) {
+      std::cerr << "invalid/incomplete data" << std::endl;
+    }
+    else if (ret == Z_MEM_ERROR) {
+      std::cerr << "out of memory" << std::endl;
+    }
+    else if (ret == Z_VERSION_ERROR) {
+      std::cerr << "version mismatch in zlib" << std::endl;
+    }
+    else if (ret == Z_BUF_ERROR) {
+      std::cerr << "zbuf error" << std::endl;
+    }
+    else {
+      std::cerr << "Z is " << ret << " / " << Z_OK << std::endl;
+    }
+    exit (1);
+  }
+  return outstring;
+}
+
+
+static int db_get_idx (sqlite3 *db, const std::string &str)
+{
+  const char *sql = "SELECT id from entries where expr = ?";
+  sqlite3_stmt *stmt;
+  int rc;
+
+  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    std::cerr << "Unexpected error (prepare) in searching cache: " <<
+      sqlite3_errmsg (db) << std::endl;
+    sqlite3_close (db);
+    exit (1);
+  }
+  rc = sqlite3_bind_text (stmt, 1, str.c_str(), -1, NULL);
+  if (rc != SQLITE_OK) {
+    std::cerr << "Unexpected error (bind_text) in searching cache: " <<
+      sqlite3_errmsg (db) << std::endl;
+    sqlite3_close (db);
+    exit (1);
+  }
+  rc = sqlite3_step (stmt);
+  int idx;
+  if (rc == SQLITE_ROW) {
+    // found the row!
+    idx = sqlite3_column_int (stmt, 0);
+  }
+  else {
+    idx = -1;
+  }
+  sqlite3_finalize (stmt);
+  return idx;
+}
+
+static int db_gen_idx (sqlite3 *db, const std::string &str)
+{
+  const char *sql = "insert into entries (expr) values (?)";
+  sqlite3_stmt *stmt;
+  int rc;
+  
+  sqlite3_exec (db, "BEGIN;", NULL, NULL, NULL);
+  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    std::cerr << "Unexpected error (prepare2) in update cache: " <<
+      sqlite3_errmsg (db) << std::endl;
+    sqlite3_close (db);
+    exit (1);
+  }
+  rc = sqlite3_bind_text (stmt, 1, str.c_str(), -1, NULL);
+  if (rc != SQLITE_OK) {
+    std::cerr << "Unexpected error (bind_text2) in update cache: " <<
+      sqlite3_errmsg (db) << std::endl;
+    sqlite3_close (db);
+    exit (1);
+  }
+  int retry = 15;
+  do {
+    rc = sqlite3_step (stmt);
+    if (rc == SQLITE_CONSTRAINT) {
+      sqlite3_finalize (stmt);
+      sqlite3_exec (db, "ROLLBACK;", NULL,  NULL, NULL);
+      return -1;
+    }
+    if (rc == SQLITE_BUSY) {
+      retry--;
+    }
+  } while (retry > 0 && rc != SQLITE_DONE);
+
+  if (rc != SQLITE_DONE) {
+    if (rc == SQLITE_BUSY) {
+      std::cerr << "Database cache access is locked for too long; giving up."
+		<< std::endl;
+    }
+    else {
+      std::cerr << "Unexpected error in updating cache: " <<
+	sqlite3_errmsg (db) << std::endl;
+    }
+    sqlite3_exec (db, "ROLLBACK;", NULL,  NULL, NULL);
+    sqlite3_close (db);
+    exit (1);
+  }
+  sqlite3_finalize (stmt);
+  return db_get_idx (db, str);
+}
+
 ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
                                       Expr *expr,
                                       list_t *in_expr_list,
                                       iHashtable *in_expr_map,
                                       iHashtable *in_width_map)
 {
-    std::string uniq_id = _gen_unique_id(expr, in_expr_map, in_width_map, targetwidth);
+  std::string uniq_id = _gen_unique_id(expr, in_expr_map, in_width_map, targetwidth);
+  sqlite3 *db;
+  sqlite3_stmt *stmt;
+  int rc;
+  const char *sql;
 
-    // already have it
-    if (path_map.contains(uniq_id)) {
-        auto idx = path_map.at(uniq_id);
-        Assert (info_map.contains(idx), "Could not find path to cached process.");
+  std::string loc = get_cache_loc();
+
+  rc = sqlite3_open (loc.c_str(), &db);
+  if (rc) {
+    std::cerr << "Could not open cache database: " << loc << std::endl;
+    sqlite3_close (db);
+    exit (1);
+  }
+  rc = sqlite3_busy_timeout (db, 5000); // 5 second timeout on locks
+
+  int idx = db_get_idx (db, uniq_id);
+  bool rollback = true;
+
+  auto errmsg = [&](const char *msg) {
+    std::cerr << "Unexpected error (" << msg << ") in update cache: " <<
+      sqlite3_errmsg (db) << std::endl;
+    if (rollback) {
+      sqlite3_exec (db, "ROLLBACK;", NULL, NULL, NULL);
     }
-    // gotta synth and add to cache
+    sqlite3_close (db);
+    exit (1);
+  };
+
+  auto errcheck = [&](int res, const char *msg) {
+    if (rc != SQLITE_OK) {
+      errmsg (msg);
+    }
+  };
+  
+  ExprBlockInfo *ebi = NULL;
+  bool from_cache = (idx == -1 ? false : true);
+
+  if (!from_cache) {
+    /* did not find this in the cache, so create a new cache entry */
+    
+    idx = db_gen_idx (db, uniq_id);
+    
+    /*
+      Entry creation might result in an error because someone else
+      concurrently created the same entry. In this case we get a -1
+      return value.
+    */ 
+    if (idx == -1) {
+      /* Get the newly created entry and switch to using the cache */
+      idx = db_get_idx (db, uniq_id);
+      if (idx == -1) {
+	/* This is a problem... so error out! */
+	std::cerr << "Unexpected database error! Inserted expr not found!" << std::endl;
+	sqlite3_close (db);
+	exit (1);
+      }
+      else {
+	/* We found it, so switch to the cache */
+	from_cache = true;
+      }
+    }
+  }
+  
+  if (from_cache) {
+    rollback = false;
+    // found the row!
+
+    // we found it in the database
+    // now access the other two tables to construct
+    // 1. the metrics
+    // 2. the files
+    // create a temp mapped file name
+    std::string fname = gen_mapped_filename ();
+
+    // grab the expression block info and save into ebi
+    sql = "select * from metrics where id = ?";
+    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    errcheck (rc, "prepare-read");
+    rc = sqlite3_bind_int (stmt, 1, idx);
+    errcheck (rc, "bind-ir1");
+    rc = sqlite3_step (stmt);
+    if (rc != SQLITE_ROW) {
+      errmsg ("metrics fetch error");
+    }
+    // get columns using sqlite3_column_..
+    
+    double vals[15];
+    for (int i=0; i < 15; i++) {
+      vals[i] = sqlite3_column_double (stmt, i+1);
+    }
+    sqlite3_finalize (stmt);
+
+    metric_triplet delay;
+    delay.set_metrics( vals[0], vals[1], vals[2] );
+    metric_triplet static_power;
+    static_power.set_metrics (vals[3], vals[4], vals[5]);
+    
+    metric_triplet dynamic_energy;
+    dynamic_energy.set_metrics(vals[6], vals[7], vals[8]);
+    
+    metric_triplet total_power;
+    total_power.set_metrics (vals[9], vals[10], vals[11]);
+
+    sql = "select mapped_v from data where id = ?";
+    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    errcheck (rc, "prepare-read2");
+    rc = sqlite3_bind_int (stmt, 1, idx);
+    errcheck (rc, "bind-ir2");
+    rc = sqlite3_step (stmt);
+    if (rc != SQLITE_ROW) {
+      errmsg ("metrics fetch error");
+    }
+    // get columns using sqlite3_column_..
+    
+    int len = sqlite3_column_bytes (stmt, 0);
+    const char *dat = (const char *) sqlite3_column_blob (stmt, 0);
+    std::string res = guzString (dat, len);
+
+    std::ofstream mapped(fname);
+    if (mapped.is_open()) {
+      mapped << res;
+      mapped.close();
+    }
     else {
-        // this is just so that the cache only has one writer at a time
-        int idx_fd = lock_file(index_file); 
-        
-        ExprBlockInfo *ebi = run_external_opt(uniq_id, targetwidth, expr, 
-                                in_expr_list, in_expr_map, in_width_map, false);
-        ebi->setID(uniq_id);
-        auto verilogfile = ebi->getMappedFile();
-        auto presynfile = ebi->getUnmappedFile();
-
-        Assert (fs::exists(path), "what");
-        expr_path idx = -1;
-        std::string fn, fn_pre;
-        do { // find the next available file name - someone could've modified
-            idx = gen_expr_path();
-            fn = path;
-            fn.append("/");
-            fn.append(std::to_string(idx));
-            fn_pre = fn;
-            fn.append(".v");
-            fn_pre.append("pre.v");
-        } while (fs::exists(fn) || fs::exists(fn_pre));
-
-        Assert (!fs::exists(fn), "cache file already exists?");
-        Assert (!fs::exists(fn_pre), "cache file (unmapped) already exists?");
-        
-        path_map.insert({uniq_id, idx});
-        Assert (!info_map.contains(idx), "cache identifier conflict");
-        info_map.insert({idx, *ebi});
-
-        // append all contents of tmp verilog file to cache file
-        std::ifstream sourceFile(verilogfile);
-        if (!sourceFile.is_open()) {
-            std::cerr << "Error opening source file: " << verilogfile << "\n";
-            exit(1);
-        }
-        int fd = lock_file(fn);
-        std::ofstream destFile(fn);
-        if (!destFile.is_open()) {
-            std::cerr << "Error opening dest file: " << fn << "\n";
-            exit(1);
-        }
-        rename_and_pipe(sourceFile, destFile, {}, {});
-
-        std::ifstream sourceFile2(presynfile);
-        if (!sourceFile2.is_open()) {
-            std::cerr << "Error opening source file: " << presynfile << "\n";
-            exit(1);
-        }
-        int fd2 = lock_file(fn_pre);
-        std::ofstream destFile2(fn_pre);
-        if (!destFile2.is_open()) {
-            std::cerr << "Error opening dest file: " << fn_pre << "\n";
-            exit(1);
-        }
-        rename_and_pipe(sourceFile2, destFile2, {}, {});
-        fs::permissions(fn    , fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::group_write, fs::perm_options::add);
-        fs::permissions(fn_pre, fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::group_write, fs::perm_options::add);
-        unlock_file(fd);
-        unlock_file(fd2);
-
-        cleanup_tmp_files();
-        unlock_file(idx_fd);
-        // write_cache_index_line (uniq_id);
+      std::cerr << "Could not create file: " << fname << std::endl;
+      exit (1);
     }
+    sqlite3_finalize (stmt);
 
-    if (!(runtime_accessed_set.contains(uniq_id)) && !(_expr_file_path.empty()))
-    {
-        // for ( auto x : runtime_accessed_set ) {
-        // fprintf (stdout, "\nMember: %s\n", x.c_str());
-        // }
-        // fprintf (stdout, "\nID: %s\n", uniq_id.c_str());
-        // read the cached defproc
-        Assert (fs::exists(path), "what");
-        std::string fn = path;
-        fn.append("/");
-        fn.append(std::to_string(path_map.at(uniq_id)));
-        std::string fn_pre = fn;
-        fn.append(".v");
-        fn_pre.append("pre.v");
-
-        // append all contents of reqd. cache file to output expr file
-        int fd = lock_file(fn);
-        std::ifstream sourceFile(fn);
-        if (!sourceFile.is_open()) {
-            std::cerr << "Error opening source file: " << fn << "\n";
-            exit(1);
-        }
-        std::ofstream destFile(_expr_file_path, std::ios::app);
-        if (!destFile.is_open()) {
-            std::cerr << "Error opening dest file: " << _expr_file_path << "\n";
-            exit(1);
-        }
-
-        std::chrono::microseconds dummy;
-        set_expr_outfile(_expr_file_path);
-        backend(fn, fn_pre, dummy, dummy);
-        set_expr_outfile("");
-        unlock_file(fd);
-        runtime_accessed_set.insert(uniq_id);
-    }
-
-    dump_at_exit.insert(uniq_id);
-
-    ExprBlockInfo eb = info_map.at(path_map.at(uniq_id));
-    ExprBlockInfo *ebi = new ExprBlockInfo(eb);
-    return ebi;
-}
-
-void ExprCache::v2act_and_pipe (std::ifstream &src, 
-                                 std::ofstream &dst)
-{
-}
-
-void ExprCache::rename_and_pipe (std::ifstream &src, 
-                                 std::ofstream &dst,
-                                 const std::vector<std::string> sfinds,
-                                 const std::vector<std::string> sreplaces)
-{
-    std::string line;
-    while (std::getline(src, line)) 
-    {
-        for ( int i=0; i<sfinds.size(); i++ ) {
-            std::size_t pos = 0;
-            auto sfind = sfinds.at(i);
-            auto sreplace = sreplaces.at(i);
-            while ((pos = line.find(sfind, pos)) != std::string::npos) 
-            {
-                line.replace(pos, sfind.size(), sreplace);
-                pos += sreplace.size();
-            }
-        }
-        dst << line << "\n";
-    }
-}
-
-void ExprCache::read_cache_unlocked()
-{
-    std::ifstream idx_file(index_file);
-    if (!idx_file.is_open()) {
-        std::cerr << "Error: Could not open cache index file (" << index_file << ") for reading.\n";
-        exit(1);
-    }
-
-    std::string line;
-    while (std::getline(idx_file, line)) {
-        std::istringstream ss(line);
-        if (line.at(0)=='#') {
-            continue; // comment
-        }
-        read_cache_index_line(line);
-        cache_counter++;
-    }
-}
-
-void ExprCache::read_cache()
-{
-    int fd = lock_file(index_file);
-    read_cache_unlocked();
-    unlock_file(fd);
-}
-
-void ExprCache::read_cache_index_line (std::string line) {
-    std::istringstream ss(line);
-
-    std::vector<std::string> tokens = {};
-    std::string token;
+    ebi = new ExprBlockInfo(delay, static_power, dynamic_energy,
+			    total_power, vals[12], vals[13], vals[14],
+			    fname, "", uniq_id);
+  }
+  else {
+    /* we need to run synthesis and prepare everything */
+    ebi = run_external_opt(uniq_id, targetwidth, expr, 
+			   in_expr_list, in_expr_map, in_width_map, false);
     
-    while (std::getline(ss, token, idx_file_delimiter)) {
-        tokens.push_back(token);
+    ebi->setID(uniq_id);
+    auto verilogfile = ebi->getMappedFile();
+    auto presynfile = ebi->getUnmappedFile();
+
+    std::string vblob;
+    {
+      std::ifstream src(presynfile);
+      std::ostringstream buf;
+      buf << src.rdbuf();
+      vblob = gzString (buf.str());
     }
+    std::string vmapblob;
+    {
+      std::ifstream src(verilogfile);
+      std::ostringstream buf;
+      buf << src.rdbuf();
+      vmapblob = gzString (buf.str());
+    }
+    // at this point, we need to update the database blobs and metrics
+
+    sql = "INSERT INTO metrics (id, delay_min, delay_typ, delay_max, static_power_min, static_power_typ, static_power_max, dynamic_energy_min, dynamic_energy_typ, dynamic_energy_max, total_power_min, total_power_typ, total_power_max, area, mapper_runtime, io_runtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+    double vals[15];
+    vals[0] = ebi->getDelay().min_val;
+    vals[1] = ebi->getDelay().typ_val;
+    vals[2] = ebi->getDelay().max_val;
     
-    Assert (tokens.size()==n_cols, "Malformed index file");
+    vals[3] = ebi->getStaticPower().min_val;
+    vals[4] = ebi->getStaticPower().typ_val;
+    vals[5] = ebi->getStaticPower().max_val;
+    
+    vals[6] = ebi->getDynamicPower().min_val;
+    vals[7] = ebi->getDynamicPower().typ_val;
+    vals[8] = ebi->getDynamicPower().max_val;
+    
+    vals[9] = ebi->getPower().min_val;
+    vals[10] = ebi->getPower().typ_val;
+    vals[11] = ebi->getPower().max_val;
+    
+    vals[12] = ebi->getArea();
+    vals[13] = ebi->getRuntime();
+    vals[14] = ebi->getIORuntime();
 
-    expr_path loc = to_expr_path(tokens[1]);
-    Assert (!path_map.contains(tokens[0]), "duplicate expression in cache index");
-    path_map.insert({tokens[0],loc});
+    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    errcheck (rc, "prepare3");
+    rc = sqlite3_bind_int (stmt, 1, idx);
+    errcheck (rc, "bind_int3");
 
-    std::vector<metric_triplet> tmp = {};
-    for (int i=0; i<n_metrics; i++) {
-        metric_triplet mt;
-        // min, typ, max in order
-        mt.set_metrics(std::stod(tokens[2+(i)]), std::stod(tokens[2+(i+1)]), std::stod(tokens[2+(i+2)]));
-        tmp.push_back(mt);
-    } 
-    Assert (tmp.size()==n_metrics, "Incomplete metrics");
+    for (int i=0; i < 15; i++) {
+      rc = sqlite3_bind_double (stmt, 2+i, vals[i]);
+      errcheck (rc, "bind_double");
+    }
+      
+    rc = sqlite3_step (stmt);
+    if (rc != SQLITE_DONE) {
+      errmsg ("step-2");
+    }
+    sqlite3_finalize (stmt);
+    
+    sql = "INSERT INTO data (id, pre_v, mapped_v) VALUES (?, ?, ?)";
+    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    errcheck (rc, "prepare4");
 
-    metric_triplet del = tmp[0];
-    metric_triplet pow = tmp[1];
-    metric_triplet st_pow = tmp[2];
-    metric_triplet dyn_pow = tmp[3];
+    rc = sqlite3_bind_int (stmt, 1, idx);
+    errcheck (rc, "bind_int4");
 
-    double area = std::stod(tokens[area_id]);
-    double mapper_runtime = std::stod(tokens[mapper_runtime_id]);
-    double io_runtime = std::stod(tokens[io_runtime_id]);
+    rc = sqlite3_bind_blob (stmt, 2, vblob.data(), vblob.size(), NULL);
+    errcheck (rc, "bind_blob1");
+    
+    rc = sqlite3_bind_blob (stmt, 3, vmapblob.data(), vmapblob.size(), NULL);
+    errcheck (rc, "bind_blob2");
 
-    ExprBlockInfo eb (del, pow, st_pow, dyn_pow, area, mapper_runtime, io_runtime, std::to_string(loc)+".v", std::to_string(loc)+"pre.v", tokens[0]);
-    Assert (!info_map.contains(loc), "duplicate data in cache index file");
-    info_map.insert({loc, eb});
-}
+    rc = sqlite3_step (stmt);
+    if (rc != SQLITE_DONE) {
+      errmsg ("step-3");
+    }
+    sqlite3_finalize (stmt);
+    sqlite3_exec (db, "COMMIT;", NULL, NULL, NULL);
+  }
 
-void ExprCache::write_cache_index_line (std::string uniq_id)
-{
-    int fd = lock_file(index_file);
-    write_cache_index_line_unlocked(uniq_id);
-    unlock_file(fd);
-}
-
-void ExprCache::write_cache_index_line_unlocked (std::string uniq_id)
-{
-    std::ofstream idx_file (index_file, std::ios::app);
-
-    Assert (path_map.contains(uniq_id), "Expr not in cache");
-    expr_path ep = path_map.at(uniq_id);
-    Assert (info_map.contains(ep), "Expr block info not found");
-    ExprBlockInfo eb = info_map.at(ep);
-
-    idx_file << uniq_id << idx_file_delimiter << ep << idx_file_delimiter;
-    idx_file << eb.getDelay().min_val << idx_file_delimiter << eb.getDelay().typ_val << idx_file_delimiter << eb.getDelay().max_val << idx_file_delimiter;
-    idx_file << eb.getPower().min_val << idx_file_delimiter << eb.getPower().typ_val << idx_file_delimiter << eb.getPower().max_val << idx_file_delimiter;
-    idx_file << eb.getStaticPower().min_val << idx_file_delimiter << eb.getStaticPower().typ_val << idx_file_delimiter << eb.getStaticPower().max_val << idx_file_delimiter;
-    idx_file << eb.getDynamicPower().min_val << idx_file_delimiter << eb.getDynamicPower().typ_val << idx_file_delimiter << eb.getDynamicPower().max_val << idx_file_delimiter;
-    idx_file << eb.getArea() << idx_file_delimiter;
-    idx_file << eb.getRuntime() << idx_file_delimiter;
-    idx_file << eb.getIORuntime();
-
-    idx_file << std::endl;
-
-    idx_file.close();
+  if (!runtime_accessed_set.contains (uniq_id)) {
+    std::chrono::microseconds dummy;
+    set_expr_outfile (_expr_file_path);
+    auto *tmp = backend(ebi->getMappedFile(), "", dummy, dummy);
+    delete tmp;
+    runtime_accessed_set.insert(uniq_id);
+  }
+  
+  if (from_cache) {
+    if (_cleanup) {
+      unlink (ebi->getMappedFile().c_str());
+    }
+  }
+  else {
+    cleanup_tmp_files ();
+  }
+  
+  sqlite3_close (db);
+  
+  return ebi;
 }

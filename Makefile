@@ -38,8 +38,8 @@ OBJS2=expr_cache.o expropt.o verilog.o abc_api.o
 
 OBJS= $(OBJS2)
 
-RLIBS := -labc
-RLIBS_SO := $(ACT_HOME)/lib/libabc.so
+RLIBS := -labc -lsqlite3
+RLIBS_SO := $(ACT_HOME)/lib/libabc.so -lsqlite3
 
 SHOBJS=$(OBJS:.o=.os)
 

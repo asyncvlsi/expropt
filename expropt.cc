@@ -285,6 +285,16 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
 }
 
 
+std::string ExternalExprOpt::gen_mapped_filename ()
+{
+  std::string verilog_file = "./";
+  verilog_file.append(VERILOG_FILE_PREFIX);
+  verilog_file.append (std::to_string (_filenum++));
+  verilog_file.append(MAPPED_FILE_SUFFIX);
+  verilog_file.append(".v");
+  return verilog_file;
+}
+  
 /**
  * The only function that does actual work!
  *
@@ -505,7 +515,7 @@ void ExternalExprOpt::run_v2act(std::string _mapped_file, bool tie_cells)
             " -n " + cell_namespace + " " + _mapped_file + " >> " + expr_output_file;
     }
   }
-  
+
   if (config_get_int("synth.expropt.verbose") == 2) {
     printf("running: %s \n",cmd.c_str());
   }
