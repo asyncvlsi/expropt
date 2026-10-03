@@ -598,7 +598,7 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     /* we need to run synthesis and prepare everything */
     ebi = run_external_opt(uniq_id, //targetwidth, expr, 
 			   in_expr_list, in_expr_map, in_width_map,
-			   out_expr_list, out_width_map,
+			   out_expr_list, out_expr_map,
 			   out_width_map, NULL, false);
 
     if (!ebi) {
