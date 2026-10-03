@@ -631,6 +631,7 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
     sqlite3_finalize (stmt);
     sqlite3_exec (db, "COMMIT;", NULL, NULL, NULL);
   }
+  sqlite3_close (db);
 
   if (!runtime_accessed_set.contains (uniq_id) && !_expr_file_path.empty()) {
     std::chrono::microseconds dummy;
@@ -649,8 +650,5 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
   else {
     cleanup_tmp_files ();
   }
-  
-  sqlite3_close (db);
-  
   return ebi;
 }
