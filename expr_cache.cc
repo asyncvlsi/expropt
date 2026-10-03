@@ -596,13 +596,41 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
   }
   else {
     /* we need to run synthesis and prepare everything */
-    ebi = run_external_opt(uniq_id, //targetwidth, expr, 
-			   in_expr_list, in_expr_map, in_width_map,
+    iHashtable *_new_in_expr_map;
+    _new_in_expr_map = ihash_new (4);
+    for (listitem_t *li = list_first (in_expr_list); li; li = list_next (li)) {
+      ihash_bucket_t *b;
+      b = ihash_lookup (in_expr_map, (long) list_value (li));
+      if (!b) {
+	errmsg ("Failure of input arguments [not a cache error]");
+      }
+      char *tmpbuf;
+      MALLOC (tmpbuf, char, 100);
+      snprintf (tmpbuf, 100, "%s%u", expr_prefix.c_str(), b->i);
+      b = ihash_add (_new_in_expr_map, (long) list_value (li));
+      b->v = tmpbuf;
+    }
+
+    std::string expr_set_name = module_prefix + uniq_id;
+    
+    ebi = run_external_opt(expr_set_name, //targetwidth, expr, 
+			   in_expr_list, _new_in_expr_map, in_width_map,
 			   out_expr_list, out_expr_map,
 			   out_width_map, NULL, false);
 
+    {
+      ihash_iter_t it;
+      ihash_bucket_t *b;
+      ihash_iter_init (_new_in_expr_map, &it);
+      while ((b = ihash_iter_next (_new_in_expr_map, &it))) {
+	FREE (b->v);
+      }
+      ihash_free (_new_in_expr_map);
+    }
+      
+
     if (!ebi) {
-      errmsg ("Logic synthesis failure, terminating.");
+      errmsg ("Logic synthesis failure, terminating. [not a cache error]");
     }
 
     ebi->setID(uniq_id);
