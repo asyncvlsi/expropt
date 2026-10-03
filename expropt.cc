@@ -340,8 +340,9 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
   // open temp verilog file to be syntesised
   verilog_stream = fopen(verilog_file.c_str(), "w");
   if (!verilog_stream) {
-    fatal_error("ExternalExprOpt::run_external_opt: "
+    warning ("ExternalExprOpt::run_external_opt: "
 		"verilog file %s is not writable", verilog_file.c_str());
+    return NULL;
   }
 
   std::chrono::microseconds io_duration(0);
@@ -395,7 +396,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
   
   configreturn = config_get_string("synth.liberty.typical");
   if (strcmp (configreturn, "none") == 0) {
-    fatal_error("please define \"liberty.typical\" in synthesis configuration file 2");
+    warning ("please define \"liberty.typical\" in synthesis configuration file 2; cannot proceed.");
+    return NULL;
   }
 
   if (mapper == "abc") {
@@ -408,7 +410,8 @@ ExprBlockInfo* ExternalExprOpt::run_external_opt (std::string expr_set_name,
   
   auto start_mapper = high_resolution_clock::now();
   if (!(*_syn_run) (&__syn)) {
-    fatal_error ("Synthesis %s failed.", mapper.c_str());
+    warning ("Synthesis %s failed.", mapper.c_str());
+    return NULL;
   }
   auto stop_mapper = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop_mapper - start_mapper);

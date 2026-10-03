@@ -215,13 +215,15 @@ std::string ExprCache::_gen_unique_id (Expr *e, iHashtable *expr_map,
  * XXX: change this to incremental reading of a file and writing a blob.
  **/
 static
-std::string gzString (const std::string &data)
+std::string gzString (const std::string &data, bool *errstate)
 {
   z_stream zs;
   memset (&zs, 0, sizeof (zs));
+  *errstate = false;
   if (deflateInit (&zs, Z_BEST_COMPRESSION) != Z_OK) {
     std::cerr << "Compression error!" << std::endl;
-    exit (1);
+    *errstate = true;
+    return std::string("");
   }
   zs.next_in = (Bytef*) data.data();
   zs.avail_in = data.size ();
@@ -241,7 +243,8 @@ std::string gzString (const std::string &data)
 
   if (ret != Z_STREAM_END) {
     std::cerr << "Compression error!" << std::endl;
-    exit (1);
+    *errstate = true;
+    return outstring;
   }    
   return outstring;
 }
@@ -534,25 +537,39 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
     /* we need to run synthesis and prepare everything */
     ebi = run_external_opt(uniq_id, targetwidth, expr, 
 			   in_expr_list, in_expr_map, in_width_map, false);
-    
+
+    if (!ebi) {
+      errmsg ("Logic synthesis failure, terminating.");
+    }
+
     ebi->setID(uniq_id);
     auto verilogfile = ebi->getMappedFile();
     auto presynfile = ebi->getUnmappedFile();
 
+    bool errstate;
     std::string vblob;
     {
       std::ifstream src(presynfile);
       std::ostringstream buf;
       buf << src.rdbuf();
-      vblob = gzString (buf.str());
+      vblob = gzString (buf.str(), &errstate);
     }
+
+    if (errstate) {
+      errmsg ("Error reading pre-synthesis output");
+    }
+
     std::string vmapblob;
     {
       std::ifstream src(verilogfile);
       std::ostringstream buf;
       buf << src.rdbuf();
-      vmapblob = gzString (buf.str());
+      vmapblob = gzString (buf.str(), &errstate);
     }
+    if (errstate) {
+      errmsg ("Error reading synthesis output");
+    }
+
     // at this point, we need to update the database blobs and metrics
 
     sql = "INSERT INTO metrics (id, delay_min, delay_typ, delay_max, static_power_min, static_power_typ, static_power_max, dynamic_energy_min, dynamic_energy_typ, dynamic_energy_max, total_power_min, total_power_typ, total_power_max, area, mapper_runtime, io_runtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
