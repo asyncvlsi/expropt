@@ -44,7 +44,8 @@ bool abc_run (act_syn_info *s)
 
   FILE *fp = fopen (sdc_file.c_str(), "w");
   if (!fp) {
-    fatal_error ("Could not open `%s' file!", sdc_file.c_str());
+    warning ("Could not open `%s' file!", sdc_file.c_str());
+    return false;
   }
   fprintf (fp, "set_load %g\n", config_get_real ("synth.expropt.default_load"));
   if (config_exists("synth.expropt.driving_cell")) {
@@ -56,22 +57,26 @@ bool abc_run (act_syn_info *s)
   api = (AbcApi *) s->space;
   
   if (!api->startSession (s->v_in.c_str(), s->v_out.c_str(), s->toplevel.c_str())) {
-    fatal_error ("Unable to start ABC session!");
+    warning ("Unable to start ABC session!");
+    return false;
   }
 
   if (!api->stdSynthesis ()) {
-    fatal_error ("Unable to run logic synthesis using ABC api");
+    warning ("Unable to run logic synthesis using ABC api");
+    return false;
   }
 
   if (config_exists ("synth.expropt.abc.use_constraints")) {
     if (config_get_int ("synth.expropt.abc.use_constraints") == 1) {
       if (!api->runTiming()) {
-	fatal_error ("Unable to run timing");
+	warning ("Unable to run timing");
+        return false;
       }
     }
   }
   if (!api->endSession ()) {
-    fatal_error ("Unable to end session with ABC");
+    warning ("Unable to end session with ABC");
+    return false;
   }
   return true;
 }

@@ -178,7 +178,8 @@ bool yosys_run (act_syn_info *s)
 
   fp = fopen (sdc_file.c_str(), "w");
   if (!fp) {
-    fatal_error ("Could not open `%s' file!", sdc_file.c_str());
+    warning ("Could not open `%s' file!", sdc_file.c_str());
+    return false;
   }
   fprintf (fp, "set_load %g\n", config_get_real ("synth.expropt.default_load"));
   fclose (fp);
@@ -217,7 +218,8 @@ bool yosys_run (act_syn_info *s)
     cmd = cmd + " write_verilog -nohex -nodec " + s->v_out + ";\" | yosys > " + s->v_out + ".log";
   }
   else {
-    fatal_error("Please define \"liberty.typical\" in expropt configuration file");
+    warning ("Please define \"liberty.typical\" in expropt configuration file");
+    return false;
   }
   
   if (config_get_int("synth.expropt.verbose") == 2) {
