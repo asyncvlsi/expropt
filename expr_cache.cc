@@ -176,38 +176,61 @@ ExprCache::ExprCache(const char *datapath_synthesis_tool,
   }
 }
 
-std::string ExprCache::_gen_unique_id (Expr *e, iHashtable *expr_map, 
-                        iHashtable *width_map, int outwidth)
+std::string ExprCache::_gen_unique_id (list_t *elist,
+				       iHashtable *in_expr_map, 
+				       iHashtable *in_width_map,
+				       iHashtable *out_width_map)
 {
+    std::string uniq_id = "";
+
     list_t *vars = list_new();
-    act_expr_collect_ids (vars, e);
-    std::string uniq_id = act_expr_to_string(vars, e);
+    for (listitem_t *li = list_first (elist); li; li = list_next (li)) {
+      Expr *e = (Expr *) list_value (li);
+      act_expr_collect_ids (vars, e);
+      std::string tmp = act_expr_to_string(vars, e);
+      if (li == list_first (elist)) {
+	uniq_id = tmp;
+      }
+      else {
+	uniq_id.append ("_");
+	uniq_id.append (tmp);
+      }
+    }
     std::string io_signature = "";
 
     std::unordered_map<ActId *, Expr *> id_to_expr = {};
+    
     ihash_iter_t iter;
     ihash_bucket_t *ib;
-    ihash_iter_init (expr_map, &iter);
-    while ((ib = ihash_iter_next (expr_map, &iter))) 
+    ihash_iter_init (in_expr_map, &iter);
+    while ((ib = ihash_iter_next (in_expr_map, &iter))) 
     {
         Expr *e1 = (Expr *)ib->key;
         id_to_expr.insert({(ActId *)(e1->u.e.l), e1});
     }
 
-    for (listitem_t *li = list_first(vars); li; li = li->next) 
+    for (listitem_t *li = list_first(vars); li; li = list_next (li))
     {
         auto id = (ActId *)(list_value(li));
-        auto b = ihash_lookup(width_map, (long)(id_to_expr.at(id)));
+        auto b = ihash_lookup(in_width_map, (long)(id_to_expr.at(id)));
         Assert (b, "var. width not found");
         int width = b->i;
         // gotta append bitwidth   
         io_signature.append("_");
         io_signature.append(std::to_string(width));
     }
-    io_signature.append("_");
-    io_signature.append(std::to_string(outwidth));
 
+    for (listitem_t *li = list_first (elist); li; li = list_next (li)) {
+      Expr *e = (Expr *) list_value (li);
+      ihash_bucket_t *b = ihash_lookup (out_width_map, (long)e);
+      Assert (b, "What?");
+      io_signature.append("_");
+      io_signature.append(std::to_string(b->i));
+    }
     uniq_id.append(io_signature);
+
+    list_free (vars);
+    
     return uniq_id;
 }
 
@@ -399,7 +422,45 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
                                       iHashtable *in_expr_map,
                                       iHashtable *in_width_map)
 {
-  std::string uniq_id = _gen_unique_id(expr, in_expr_map, in_width_map, targetwidth);
+  iHashtable *oH = ihash_new (1);
+  ihash_bucket_t *b = ihash_add (oH, (long)expr);
+  b->i = targetwidth;
+  list_t *tmpl = list_new ();
+  list_append (tmpl, expr);
+
+  iHashtable *oHm = ihash_new (1);
+  b = ihash_add (oHm, (long)expr);
+  char buf[128];
+  snprintf (buf, 128, "out");
+  b->v = buf;
+
+  ExprBlockInfo *ebi = synth_expr_multi (in_expr_list,
+					 in_expr_map,
+					 in_width_map,
+					 tmpl,
+					 oHm,
+					 oH);
+
+  list_free (tmpl);
+  ihash_free (oH);
+  ihash_free (oHm);
+  
+  return ebi;
+}
+
+
+ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
+					    iHashtable *in_expr_map,
+					    iHashtable *in_width_map,
+					    list_t *out_expr_list,
+					    iHashtable *out_expr_map,
+					    iHashtable *out_width_map)
+{
+  std::string uniq_id = _gen_unique_id (out_expr_list,
+					in_expr_map,
+					in_width_map,
+					out_width_map);
+
   sqlite3 *db;
   sqlite3_stmt *stmt;
   int rc;
@@ -535,8 +596,10 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
   }
   else {
     /* we need to run synthesis and prepare everything */
-    ebi = run_external_opt(uniq_id, targetwidth, expr, 
-			   in_expr_list, in_expr_map, in_width_map, false);
+    ebi = run_external_opt(uniq_id, //targetwidth, expr, 
+			   in_expr_list, in_expr_map, in_width_map,
+			   out_expr_list, out_width_map,
+			   out_width_map, NULL, false);
 
     if (!ebi) {
       errmsg ("Logic synthesis failure, terminating.");
@@ -652,3 +715,4 @@ ExprBlockInfo *ExprCache::synth_expr (int targetwidth,
   }
   return ebi;
 }
+

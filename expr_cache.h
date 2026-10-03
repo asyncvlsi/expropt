@@ -47,8 +47,22 @@ public:
         run_external_opt for the expropt object. 
         Arguments are exactly the same.
     */
-    ExprBlockInfo *synth_expr (int, Expr *, list_t *, iHashtable *, iHashtable *);
+    ExprBlockInfo *synth_expr (int targetwidth,
+			       Expr *expr,
+			       list_t *in_expr_list,
+			       iHashtable *in_expr_map,
+			       iHashtable *in_width_map);
 
+    /*
+      Top-level function for multi-output synthesis
+    */
+    ExprBlockInfo *synth_expr_multi (list_t *in_expr_list,
+				     iHashtable *in_expr_map,
+				     iHashtable *in_width_map,
+				     list_t *out_expr_list,
+				     iHashtable *out_expr_map,
+				     iHashtable *out_width_map);
+  
     /*
         Get path to cache that is being used.
     */
@@ -59,7 +73,7 @@ public:
     }
 
 private:
-    std::string _gen_unique_id (Expr *, iHashtable *, iHashtable *, int);
+    std::string _gen_unique_id (list_t *, iHashtable *, iHashtable *, iHashtable *);
     std::string path;
     std::string _expr_file_path;
     std::unordered_set<std::string> runtime_accessed_set;
