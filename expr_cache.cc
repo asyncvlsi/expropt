@@ -397,6 +397,10 @@ static int db_gen_idx (sqlite3 *db, const std::string &str)
     if (rc == SQLITE_BUSY) {
       retry--;
     }
+    else if (rc != SQLITE_DONE) {
+      warning ("SQL error: %s", sqlite3_errmsg (db));
+      retry = 0;
+    }
   } while (retry > 0 && rc != SQLITE_DONE);
 
   if (rc != SQLITE_DONE) {
