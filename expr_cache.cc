@@ -589,6 +589,9 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
       }
       else {
 	/* We found it, so switch to the cache */
+	cleanup_tmp_files ();
+	delete ebi;
+	ebi = NULL;
 	from_cache = true;
       }
     }
