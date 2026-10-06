@@ -59,6 +59,25 @@ void chk_error (sqlite3 *db, int rc, const char *msg)
 }
 
 
+#define RETRY_LOOP(stmt)				\
+  do {							\
+    int retry = 15;					\
+    do {						\
+      rc = stmt;					\
+      if (rc == SQLITE_BUSY) {				\
+	retry--;					\
+	if (retry > 0) {				\
+	  warning ("database locked; retrying...");	\
+	  sleep (5);					\
+	}						\
+      }							\
+      else {						\
+	break;						\
+      }							\
+    } while (retry > 0);				\
+  } while (0)
+
+
 void run_info (sqlite3 *db)
 {
   sqlite3_stmt *stmt;
@@ -66,9 +85,9 @@ void run_info (sqlite3 *db)
   int rc;
 
   sql = "select * from entries";
-  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
   chk_error (db, rc, "info: prepare");
-  rc = sqlite3_step (stmt);
+  RETRY_LOOP (sqlite3_step (stmt));
   while (rc == SQLITE_ROW) {
     const unsigned char *txt = sqlite3_column_text (stmt, 0);
     int idx = sqlite3_column_int (stmt, 1);
@@ -91,13 +110,13 @@ void run_metrics (sqlite3 *db, int num)
 
   sql = "select * from metrics where id = ?";
 
-  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
   chk_error (db, rc, "metrics: prepare");
   
   rc = sqlite3_bind_int (stmt, 1, num);
   chk_error (db, rc, "metrics: bind ind");
 
-  rc = sqlite3_step (stmt);
+  RETRY_LOOP (sqlite3_step (stmt));
   int idx;
   if (rc == SQLITE_ROW) {
     double v[15];
@@ -127,13 +146,13 @@ void run_getid (sqlite3 *db, char *name)
 
   sql = "select id from entries where expr = ?";
 
-  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
   chk_error (db, rc, "getid: prepare");
   
   rc = sqlite3_bind_text (stmt, 1, name, -1, NULL);
   chk_error (db, rc, "getid: bind text");
 
-  rc = sqlite3_step (stmt);
+  RETRY_LOOP (sqlite3_step (stmt));
   int idx;
   if (rc == SQLITE_ROW) {
     idx = sqlite3_column_int (stmt, 0);
@@ -225,11 +244,11 @@ void run_getv (sqlite3 *db, int num, char *file, bool mapped)
   else {
     sql = "select pre_v from data where id = ?";
   }
-  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
   chk_error (db, rc, "getv prepare");
   rc = sqlite3_bind_int (stmt, 1, num);
   chk_error (db, rc, "getv bind int");
-  rc = sqlite3_step (stmt);
+  RETRY_LOOP (sqlite3_step (stmt));
   if (rc != SQLITE_ROW) {
     printf ("Error: could not find expression `%d'\n", num);
     sqlite3_finalize (stmt);
@@ -267,7 +286,8 @@ int main (int argc, char **argv)
 
   int rc;
   sqlite3 *db;
-  rc = sqlite3_open (loc.c_str(), &db);
+
+  RETRY_LOOP (sqlite3_open (loc.c_str(), &db));
   chk_error (db, rc, "database open");
 
   if (strcmp (argv[2], "info") == 0) {
