@@ -331,6 +331,24 @@ std::string guzString (const char *dat, int len)
   return outstring;
 }
 
+#define RETRY_LOOP(stmt)				\
+  do {							\
+    int retry = 15;					\
+    do {						\
+      rc = stmt;					\
+      if (rc == SQLITE_BUSY) {				\
+	retry--;					\
+	if (retry > 0) {				\
+	  warning ("database locked; retrying...");	\
+	  sleep (5);					\
+	}						\
+      }							\
+      else {						\
+	break;						\
+      }							\
+    } while (retry > 0);				\
+  } while (0)
+
 
 static int db_get_idx (sqlite3 *db, const std::string &str)
 {
@@ -338,13 +356,14 @@ static int db_get_idx (sqlite3 *db, const std::string &str)
   sqlite3_stmt *stmt;
   int rc;
 
-  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+  RETRY_LOOP(sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
   if (rc != SQLITE_OK) {
     std::cerr << "Unexpected error (prepare) in searching cache: " <<
       sqlite3_errmsg (db) << std::endl;
     sqlite3_close (db);
     exit (1);
   }
+
   rc = sqlite3_bind_text (stmt, 1, str.c_str(), -1, NULL);
   if (rc != SQLITE_OK) {
     std::cerr << "Unexpected error (bind_text) in searching cache: " <<
@@ -352,7 +371,8 @@ static int db_get_idx (sqlite3 *db, const std::string &str)
     sqlite3_close (db);
     exit (1);
   }
-  rc = sqlite3_step (stmt);
+
+  RETRY_LOOP(sqlite3_step (stmt));
   int idx;
   if (rc == SQLITE_ROW) {
     // found the row!
@@ -361,7 +381,7 @@ static int db_get_idx (sqlite3 *db, const std::string &str)
   else {
     idx = -1;
   }
-  sqlite3_finalize (stmt);
+  RETRY_LOOP (sqlite3_finalize (stmt));
   return idx;
 }
 
@@ -370,15 +390,23 @@ static int db_gen_idx (sqlite3 *db, const std::string &str)
   const char *sql = "insert into entries (expr) values (?)";
   sqlite3_stmt *stmt;
   int rc;
-  
-  sqlite3_exec (db, "BEGIN;", NULL, NULL, NULL);
-  rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+
+  RETRY_LOOP(sqlite3_exec (db, "BEGIN;", NULL, NULL, NULL));
+  if (rc != SQLITE_OK) {
+    std::cerr << "Unexpected error (exec) in update cache: " <<
+      sqlite3_errmsg (db) << std::endl;
+    sqlite3_close (db);
+    exit (1);
+  }
+
+  RETRY_LOOP(sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
   if (rc != SQLITE_OK) {
     std::cerr << "Unexpected error (prepare2) in update cache: " <<
       sqlite3_errmsg (db) << std::endl;
     sqlite3_close (db);
     exit (1);
   }
+
   rc = sqlite3_bind_text (stmt, 1, str.c_str(), -1, NULL);
   if (rc != SQLITE_OK) {
     std::cerr << "Unexpected error (bind_text2) in update cache: " <<
@@ -386,6 +414,7 @@ static int db_gen_idx (sqlite3 *db, const std::string &str)
     sqlite3_close (db);
     exit (1);
   }
+
   int retry = 15;
   do {
     rc = sqlite3_step (stmt);
@@ -402,7 +431,6 @@ static int db_gen_idx (sqlite3 *db, const std::string &str)
       retry = 0;
     }
   } while (retry > 0 && rc != SQLITE_DONE);
-
   if (rc != SQLITE_DONE) {
     if (rc == SQLITE_BUSY) {
       std::cerr << "Database cache access is locked for too long; giving up."
@@ -478,7 +506,7 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     sqlite3_close (db);
     exit (1);
   }
-  rc = sqlite3_busy_timeout (db, 5000); // 5 second timeout on locks
+  rc = sqlite3_busy_timeout (db, 10000); // 10 second timeout on locks
 
   int idx = db_get_idx (db, uniq_id);
   bool rollback = true;
@@ -498,7 +526,7 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
       errmsg (msg);
     }
   };
-  
+
   ExprBlockInfo *ebi = NULL;
   bool from_cache = (idx == -1 ? false : true);
 
@@ -541,11 +569,14 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
 
     // grab the expression block info and save into ebi
     sql = "select * from metrics where id = ?";
-    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+
+    RETRY_LOOP(sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
     errcheck (rc, "prepare-read");
+    
     rc = sqlite3_bind_int (stmt, 1, idx);
     errcheck (rc, "bind-ir1");
-    rc = sqlite3_step (stmt);
+
+    RETRY_LOOP (sqlite3_step (stmt));
     if (rc != SQLITE_ROW) {
       errmsg ("metrics fetch error");
     }
@@ -555,7 +586,7 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     for (int i=0; i < 15; i++) {
       vals[i] = sqlite3_column_double (stmt, i+1);
     }
-    sqlite3_finalize (stmt);
+    RETRY_LOOP (sqlite3_finalize (stmt));
 
     metric_triplet delay;
     delay.set_metrics( vals[0], vals[1], vals[2] );
@@ -569,11 +600,11 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     total_power.set_metrics (vals[9], vals[10], vals[11]);
 
     sql = "select mapped_v from data where id = ?";
-    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
     errcheck (rc, "prepare-read2");
     rc = sqlite3_bind_int (stmt, 1, idx);
     errcheck (rc, "bind-ir2");
-    rc = sqlite3_step (stmt);
+    RETRY_LOOP (sqlite3_step (stmt));
     if (rc != SQLITE_ROW) {
       errmsg ("metrics fetch error");
     }
@@ -592,7 +623,7 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
       std::cerr << "Could not create file: " << fname << std::endl;
       exit (1);
     }
-    sqlite3_finalize (stmt);
+    RETRY_LOOP (sqlite3_finalize (stmt));
 
     ebi = new ExprBlockInfo(delay, static_power, dynamic_energy,
 			    total_power, vals[12], vals[13], vals[14],
@@ -690,7 +721,7 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     vals[13] = ebi->getRuntime();
     vals[14] = ebi->getIORuntime();
 
-    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
     errcheck (rc, "prepare3");
     rc = sqlite3_bind_int (stmt, 1, idx);
     errcheck (rc, "bind_int3");
@@ -700,14 +731,14 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
       errcheck (rc, "bind_double");
     }
       
-    rc = sqlite3_step (stmt);
+    RETRY_LOOP (sqlite3_step (stmt));
     if (rc != SQLITE_DONE) {
       errmsg ("step-2");
     }
-    sqlite3_finalize (stmt);
+    RETRY_LOOP (sqlite3_finalize (stmt));
     
     sql = "INSERT INTO data (id, pre_v, mapped_v) VALUES (?, ?, ?)";
-    rc = sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL);
+    RETRY_LOOP (sqlite3_prepare_v2 (db, sql, -1, &stmt, NULL));
     errcheck (rc, "prepare4");
 
     rc = sqlite3_bind_int (stmt, 1, idx);
@@ -719,12 +750,12 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     rc = sqlite3_bind_blob (stmt, 3, vmapblob.data(), vmapblob.size(), NULL);
     errcheck (rc, "bind_blob2");
 
-    rc = sqlite3_step (stmt);
+    RETRY_LOOP (sqlite3_step (stmt));
     if (rc != SQLITE_DONE) {
       errmsg ("step-3");
     }
-    sqlite3_finalize (stmt);
-    sqlite3_exec (db, "COMMIT;", NULL, NULL, NULL);
+    RETRY_LOOP(sqlite3_finalize (stmt));
+    RETRY_LOOP(sqlite3_exec (db, "COMMIT;", NULL, NULL, NULL));
   }
   sqlite3_close (db);
 
