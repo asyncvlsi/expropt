@@ -665,9 +665,8 @@ ExprBlockInfo *ExprCache::synth_expr_multi (list_t *in_expr_list,
     }
     RETRY_LOOP (sqlite3_finalize (stmt));
 
-    ebi = new ExprBlockInfo(delay, static_power, dynamic_energy,
-			    total_power, vals[12], vals[13], vals[14],
-			    fname, "", uniq_id);
+    ebi = new ExprBlockInfo(delay, total_power, static_power, dynamic_energy,
+			    vals[12], vals[13], vals[14], fname, "", uniq_id);
   }
   else {
     /*-- now update the cache --*/
