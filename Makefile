@@ -26,7 +26,7 @@ TARGETLIBS=$(SHLIB) \
 	act_extsyn_yosys.so \
 	act_extsyn_abc.so
 
-TARGETINCS=expr_cache.h expropt.h expr_info.h
+TARGETINCS=expr_cache.h expropt.h expr_info.h expr_profile.h
 
 TARGETINCSUBDIR=act
 
@@ -34,7 +34,7 @@ TARGETCONF=expropt.conf
 
 CPPSTD=c++20
 
-OBJS2=expr_cache.o expropt.o verilog.o abc_api.o 
+OBJS2=expr_cache.o expropt.o verilog.o abc_api.o expr_profile.o
 
 OBJS=$(OBJS2) main.o
 
@@ -58,7 +58,7 @@ $(SHLIB): $(SHOBJS)
 	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(RLIBS_SO)
 
 act_extsyn_yosys.so: yosys.os
-	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os $(SHLIBACT)
+	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os $(SHLIBACT) -lexpropt_sh
 
 act_extsyn_abc.so: abc.os abc_api.os
 	$(ACT_HOME)/scripts/linkso act_extsyn_abc.so abc.os abc_api.os $(SHLIBACT) $(RLIBS_SO)
