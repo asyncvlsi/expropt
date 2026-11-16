@@ -25,6 +25,7 @@
 #include <sstream>
 #include "abc_api.h"
 #include "expr_cache.h"
+#include "expr_profile.h"
 #include <sys/file.h>   
 #include <fcntl.h>    
 #include <unistd.h>
@@ -60,6 +61,13 @@ std::string ExprCache::get_cache_loc()
 
     ret.append ("_");
     ret.append (mapper);
+
+    /* results depend on the synthesis profile: keep one cache per profile */
+    std::string profile = expr_profile_name ();
+    if (!profile.empty ()) {
+      ret.append ("_");
+      ret.append (profile);
+    }
     ret.append (".db");
 
     return ret;

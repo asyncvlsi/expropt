@@ -72,3 +72,19 @@ debug:
 	fi
 
 -include Makefile.deps
+
+#
+# Synthesis profile templates: profiles/<tech>/* is installed into
+# $ACT_HOME/conf/<tech>/expropt_profiles/ as part of "make install"
+#
+PROFILE_TECHS=$(notdir $(wildcard profiles/*))
+
+install: install_profiles
+
+install_profiles:
+	@for t in $(PROFILE_TECHS); do \
+		mkdir -p $(INSTALLCONF)/$$t/expropt_profiles; \
+		for f in profiles/$$t/*; do \
+		$(ACT_HOME)/scripts/install $$f $(INSTALLCONF)/$$t/expropt_profiles/`basename $$f`; \
+		done; \
+	done
