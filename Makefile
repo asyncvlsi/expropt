@@ -26,7 +26,7 @@ TARGETLIBS=$(SHLIB) \
 	act_extsyn_yosys.so \
 	act_extsyn_abc.so
 
-TARGETINCS=expr_cache.h expropt.h expr_info.h
+TARGETINCS=expr_cache.h expropt.h expr_info.h expr_profile.h
 
 TARGETINCSUBDIR=act
 
@@ -34,7 +34,7 @@ TARGETCONF=expropt.conf
 
 CPPSTD=c++20
 
-OBJS2=expr_cache.o expropt.o verilog.o abc_api.o 
+OBJS2=expr_cache.o expropt.o verilog.o abc_api.o expr_profile.o
 
 OBJS=$(OBJS2) main.o
 
@@ -58,7 +58,7 @@ $(SHLIB): $(SHOBJS)
 	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(RLIBS_SO)
 
 act_extsyn_yosys.so: yosys.os
-	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os $(SHLIBACT)
+	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os $(SHLIBACT) -lexpropt_sh
 
 act_extsyn_abc.so: abc.os abc_api.os
 	$(ACT_HOME)/scripts/linkso act_extsyn_abc.so abc.os abc_api.os $(SHLIBACT) $(RLIBS_SO)
@@ -72,3 +72,19 @@ debug:
 	fi
 
 -include Makefile.deps
+
+#
+# Synthesis profile templates: profiles/<tech>/* is installed into
+# $ACT_HOME/conf/<tech>/expropt_profiles/ as part of "make install"
+#
+PROFILE_TECHS=$(notdir $(wildcard profiles/*))
+
+install: install_profiles
+
+install_profiles:
+	@for t in $(PROFILE_TECHS); do \
+		mkdir -p $(INSTALLCONF)/$$t/expropt_profiles; \
+		for f in profiles/$$t/*; do \
+		$(ACT_HOME)/scripts/install $$f $(INSTALLCONF)/$$t/expropt_profiles/`basename $$f`; \
+		done; \
+	done
