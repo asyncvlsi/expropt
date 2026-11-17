@@ -58,7 +58,7 @@ $(SHLIB): $(SHOBJS)
 	$(ACT_HOME)/scripts/linkso $(SHLIB) $(SHOBJS) $(SHLIBACT) $(RLIBS_SO)
 
 act_extsyn_yosys.so: yosys.os
-	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os expr_profile.os $(SHLIBACT) -lexpropt_sh
+	$(ACT_HOME)/scripts/linkso act_extsyn_yosys.so yosys.os expr_profile.os $(SHLIBACT)
 
 act_extsyn_abc.so: abc.os abc_api.os
 	$(ACT_HOME)/scripts/linkso act_extsyn_abc.so abc.os abc_api.os $(SHLIBACT) $(RLIBS_SO)
