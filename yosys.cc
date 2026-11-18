@@ -65,8 +65,8 @@ static double parse_yosys_info (std::string file, double *area)
 }
 
 /*
- * Profile mode: fill yosys_<profile>.sdc and yosys_<profile>.tcl
- * for this expression and run yosys on the generated Tcl script.
+ * Profile mode: fill yosys_<profile>.sdc and yosys_<profile>.script
+ * for this expression and run yosys on the generated script.
  * The output goes to <v_out>.log, exactly like the default mode, so
  * yosys_get_metric() and yosys_cleanup() work unchanged.
  */
@@ -78,7 +78,7 @@ static bool yosys_run_profile (act_syn_info *s, const std::string &sdc_file)
     return false;
   }
 
-  std::string tcl_file = s->v_out + ".tcl";
+  std::string script_file = s->v_out + ".script";
 
   std::map<std::string, std::string> vars = {
     { "VIN",  s->v_in },
@@ -91,12 +91,12 @@ static bool yosys_run_profile (act_syn_info *s, const std::string &sdc_file)
   if (!expr_profile_instantiate ("yosys", "sdc", vars, {}, sdc_file)) {
     return false;
   }
-  if (!expr_profile_instantiate ("yosys", "tcl", vars,
-                                 { "VIN", "VOUT", "TOP", "LIB" }, tcl_file)) {
+  if (!expr_profile_instantiate ("yosys", "script", vars,
+                                 { "VIN", "VOUT", "TOP", "LIB" }, script_file)) {
     return false;
   }
 
-  std::string cmd = "yosys -c " + tcl_file + " > " + s->v_out + ".log 2>&1";
+  std::string cmd = "yosys -s " + script_file + " > " + s->v_out + ".log 2>&1";
 
   if (config_get_int("synth.expropt.verbose") == 2) {
     printf("running: %s \n", cmd.c_str());
