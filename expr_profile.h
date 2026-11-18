@@ -5,7 +5,7 @@
  *
  *  A profile is a pair of template files
  *
- *     <profile_dir>/<engine>_<profile>.tcl    synthesis script
+ *     <profile_dir>/<engine>_<profile>.script synthesis script
  *     <profile_dir>/<engine>_<profile>.sdc    constraints
  *
  *  containing @NAME@ placeholders (NAME made of A-Z, 0-9, _) that are

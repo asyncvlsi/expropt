@@ -1,0 +1,5 @@
+# yosys "area" profile: minimize the area of each expression block
+read_verilog @VIN@
+synth -noabc -top @TOP@
+abc -liberty @LIB@ -constr @SDC@ -script "+strash;ifraig;dc2;strash;dch -f;map -a;topo;stime -p"
+write_verilog -nohex -nodec @VOUT@
